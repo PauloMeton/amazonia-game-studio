@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Amazônia Game Studio — Editor de Jogos 2D</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  :root{--bg:#0f1a12;--panel:#16241a;--panel2:#1d3025;--line:#2c4a36;--txt:#dff3e6;--muted:#8fb89c;--accent:#7FFFD4;--accent2:#D4AF37;--danger:#ff6b6b}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:13px;overflow:hidden}
+  button{font-family:inherit;font-size:12px;cursor:pointer;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);padding:6px 10px;transition:.12s}
+  button:hover{border-color:var(--accent);color:var(--accent)}
+  button.on{background:#1B4332;border-color:var(--accent);color:var(--accent)}
+  button.primary{background:#1B4332;border-color:var(--accent);color:var(--accent)}
+  button.danger{border-color:#5a2b2b;color:var(--danger)}
+  input,select,textarea{font-family:inherit;font-size:12px;background:#0c1610;color:var(--txt);border:1px solid var(--line);border-radius:5px;padding:5px 6px;width:100%}
+  textarea{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;line-height:1.4;resize:vertical}
+  input[type=color]{padding:2px;height:30px;cursor:pointer}
+  input[type=checkbox]{width:auto}
+  label{display:block;color:var(--muted);font-size:11px;margin:0 0 3px}
+  .app{display:grid;grid-template-rows:auto 1fr;height:100%}
+  header{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  header .logo{font-weight:700;letter-spacing:.04em;color:var(--accent)}
+  header .logo small{color:var(--muted);font-weight:400}
+  header .spacer{flex:1}
+  .hide{display:none!important}
+  .main{display:grid;grid-template-columns:230px 1fr 260px;overflow:hidden}
+  .side{background:var(--panel);overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:10px}
+  .side.left{border-right:1px solid var(--line)} .side.right{border-left:1px solid var(--line)}
+  .card{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px}
+  .card h3{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--accent2);margin-bottom:8px}
+  .tools{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .row{display:flex;gap:6px;align-items:center}
+  .note{font-size:11px;color:var(--muted);line-height:1.4}
+  .center{position:relative;display:flex;flex-direction:column;overflow:hidden;background:#070d09}
+  #stage{position:relative;flex:1;overflow:hidden}
+  #game{position:absolute;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated;touch-action:none}
+  .vtools{position:absolute;top:8px;left:8px;display:flex;gap:6px;z-index:5}
+  .vtools button{background:rgba(13,22,16,.85)}
+  #log{height:96px;border-top:1px solid var(--line);background:#0a120d;color:var(--muted);font-family:ui-monospace,monospace;font-size:11px;padding:6px 10px;overflow-y:auto;white-space:pre-wrap}
+  .asset{display:flex;align-items:center;gap:8px;padding:5px;border:1px solid var(--line);border-radius:6px;margin-bottom:5px;cursor:pointer;background:#0c1610}
+  .asset.sel{border-color:var(--accent)}
+  .asset canvas{image-rendering:pixelated;width:34px;height:34px;background:#000;border-radius:4px;flex:0 0 auto}
+  .asset .nm{flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .beh{border:1px solid var(--line);border-radius:6px;padding:6px;margin-bottom:6px;background:#0c1610}
+  .beh .bt{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--accent2);margin-bottom:4px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  /* auth */
+  #authgate{position:fixed;inset:0;z-index:20000;background:radial-gradient(ellipse at center,#16241a,#070d09);display:flex;align-items:center;justify-content:center}
+  .auth-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;width:340px;max-width:92%;display:flex;flex-direction:column;gap:9px}
+  .auth-logo{font-weight:800;color:var(--accent);text-align:center;font-size:1.25em;margin-bottom:4px}
+  .modal{display:none;position:fixed;inset:0;z-index:15000;background:rgba(0,0,0,.62);align-items:center;justify-content:center}
+  .modal.open{display:flex}
+</style>
+</head>
+<body>
+<div id="authgate">
+  <div class="auth-card">
+    <div class="auth-logo">AMAZÔNIA Game Studio</div>
+    <input id="au-email" type="email" placeholder="e-mail">
+    <input id="au-pass" type="password" placeholder="senha">
+    <button class="primary" id="btnLogin">Entrar</button>
+    <button id="btnSignup">Criar conta</button>
+    <button id="btnSkip">Entrar sem login (local)</button>
+    <p class="note" id="auth-msg"></p>
+  </div>
+</div>
+
+<div id="profile" class="modal">
+  <div class="auth-card" style="width:480px;max-width:94%">
+    <div class="row" style="justify-content:space-between"><div class="auth-logo" style="margin:0;font-size:1.1em">Perfil</div><button id="profClose">fechar</button></div>
+    <p class="note">Conta: <b id="prof-email"></b></p>
+    <button class="primary" id="profSave">☁ Salvar este jogo na nuvem</button>
+    <p class="note" id="prof-msg"></p>
+    <h3 style="color:var(--accent2);font-size:11px;text-transform:uppercase;margin-top:6px">Meus jogos</h3>
+    <div id="prof-scenes" style="max-height:240px;overflow:auto"></div>
+  </div>
+</div>
+
+<div id="artsModal" class="modal">
+  <div class="auth-card" style="width:480px;max-width:94%">
+    <div class="row" style="justify-content:space-between"><div class="auth-logo" style="margin:0;font-size:1.05em">Minhas pixel arts (nuvem)</div><button id="artsClose">fechar</button></div>
+    <p class="note">Clique para adicionar à biblioteca de objetos do jogo.</p>
+    <div id="artsList" style="max-height:300px;overflow:auto"></div>
+  </div>
+</div>
+
+<div id="tutModal" class="modal">
+  <div class="auth-card" style="width:560px;max-width:95%;max-height:92%;overflow:auto;gap:6px">
+    <div class="row" style="justify-content:space-between"><div class="auth-logo" style="margin:0;font-size:1.1em">Como usar o Game Studio</div><button id="tutClose">fechar</button></div>
+    <ol style="margin:6px 0 0 18px;line-height:1.7;color:var(--txt)">
+      <li><b>🎨 Editor de Arte</b> — crie/edite seu personagem (animações, sprite-sheet, IA) e clique em <b>“Usar no jogo”</b> para mandar pra biblioteca. Ou importe artes da nuvem/.json.</li>
+      <li><b>▦ Plataforma</b> — pinte o chão e as plataformas na grade (botão direito apaga). Roda do mouse dá zoom; <b>✋ Mover câmera</b> arrasta a tela.</li>
+      <li><b>＋ Colocar</b> — escolha um objeto na biblioteca e clique na cena para posicioná-lo.</li>
+      <li><b>✦ Selecionar</b> — arraste para mover. No <b>Inspetor</b> ajuste escala/animação e adicione <b>Comportamentos</b>: Player Plataforma, Player Top-down, Patrulha, Perseguir, Coletável, Perigo, e <b>Tecla → Animação</b>.</li>
+      <li><b>Script (JS) + IA</b> — descreva o que o objeto faz e gere o código com a <b>✨ IA</b>, ou use os exemplos prontos.</li>
+      <li><b>Camadas</b> — organize o que fica na frente/atrás; a camada destacada é onde os objetos novos entram.</li>
+      <li><b>▶ Jogar</b> — teste (Setas/WASD mover, Espaço/↑ pular, J ação, Esc sair). <b>⬇ Exportar jogo</b> gera um HTML jogável pra compartilhar.</li>
+    </ol>
+    <p class="note">Dica: pelo menos um objeto precisa de um comportamento de <b>Player</b> para a câmera segui-lo.</p>
+  </div>
+</div>
+
+<div id="artEditor" style="display:none;position:fixed;inset:0;z-index:16000;background:#070d09;flex-direction:column">
+  <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line)">
+    <b style="color:var(--accent)">Editor de Arte</b>
+    <span class="note">crie/edite e clique em "Usar no jogo" para mandar pra biblioteca</span>
+    <div style="flex:1"></div>
+    <button class="primary" id="artUse">➕ Usar no jogo</button>
+    <button id="artClose">Fechar</button>
+  </div>
+  <iframe id="artFrame" title="Editor de Arte" style="flex:1;border:0;width:100%;background:#0f1a12"></iframe>
+</div>
+
+<div class="app">
+  <header>
+    <div class="logo">AMAZÔNIA <small>Game Studio</small></div>
+    <input id="projName" value="meu-jogo" style="max-width:150px">
+    <span class="note" id="saveDot">salvo</span>
+    <button class="primary" id="btnPlay">▶ Jogar</button>
+    <button id="btnStop" class="hide">■ Parar</button>
+    <button id="btnTut">❓ Tutorial</button>
+    <div class="spacer"></div>
+    <span id="userBox" class="note hide"></span>
+    <button id="cloudBtn" class="hide">☁ Salvar</button>
+    <button id="profileBtn" class="hide">Perfil</button>
+    <button id="btnArt">🎨 Editor de Arte</button>
+    <button id="btnNew">Novo</button>
+    <button id="btnExportJson">.json</button>
+    <button id="btnExportGame">⬇ Exportar jogo</button>
+    <button id="btnOpenJson">Abrir</button>
+    <input type="file" id="fileScene" accept=".json" class="hide">
+    <button id="logoutBtn" class="hide">Sair</button>
+  </header>
+
+  <div class="main">
+    <div class="side left">
+      <div class="card"><h3>Cena</h3>
+        <label>Tipo de jogo</label>
+        <select id="modeSel"><option value="platformer">Plataforma (lateral)</option><option value="topdown">Top-down (visto de cima)</option></select>
+        <div class="grid2" style="margin-top:6px">
+          <div><label>Tamanho do tile</label><input type="number" id="tileSize" value="32" min="8" max="128"></div>
+          <div id="gravityRow"><label>Gravidade</label><input type="number" id="gravity" value="1800" min="0" max="6000"></div>
+        </div>
+        <div class="grid2" style="margin-top:6px">
+          <div><label>Fundo</label><input type="color" id="bgColor" value="#0a0f0c"></div>
+          <div><label>Cor do tile</label><input type="color" id="tileColor" value="#3a5d44"></div>
+        </div>
+      </div>
+
+      <div class="card"><h3>Ferramentas</h3>
+        <div class="tools" id="toolBtns"></div>
+        <div class="row" style="margin-top:8px"><label class="row" style="margin:0"><input type="checkbox" id="gridChk" checked> grade</label><label class="row" style="margin:0"><input type="checkbox" id="snapChk" checked> encaixar</label></div>
+        <p class="note" id="toolHint" style="margin-top:6px"></p>
+      </div>
+
+      <div class="card"><h3>Objetos (suas artes)</h3>
+        <div id="assetList"><p class="note">Nenhuma arte ainda.</p></div>
+        <button style="width:100%;margin-top:6px" id="artsCloudBtn">☁ Minhas artes (nuvem)</button>
+        <button style="width:100%;margin-top:5px" id="artsLocalBtn">⬇ Importar do Pixel Studio (local)</button>
+        <button style="width:100%;margin-top:5px" id="artsFileBtn">📁 Importar .json</button>
+        <input type="file" id="fileArt" accept=".json" class="hide">
+      </div>
+
+      <div class="card"><h3>Camadas (baixo → cima)</h3>
+        <div id="layerList"></div>
+        <button id="addLayer" style="width:100%;margin-top:6px">+ camada</button>
+        <p class="note" style="margin-top:4px">A camada destacada é a ativa (objetos novos vão nela). 👁 mostra/oculta.</p>
+      </div>
+    </div>
+
+    <div class="center">
+      <div id="stage">
+        <canvas id="game"></canvas>
+        <div class="vtools">
+          <button id="zoomIn">+</button><button id="zoomOut">−</button><button id="zoomReset">⤢</button>
+        </div>
+      </div>
+      <div id="log"></div>
+    </div>
+
+    <div class="side right">
+      <div class="card"><h3>Inspetor</h3><div id="insp"><p class="note">Selecione um objeto na cena (ferramenta Selecionar).</p></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============ ESTADO ============ */
+const FB={ apiKey:"AIzaSyALwzr4Ur2X0ptWIjQJq57kVf62vCa0FIY", authDomain:"ia-asset-studio.firebaseapp.com", projectId:"ia-asset-studio", storageBucket:"ia-asset-studio.firebasestorage.app", messagingSenderId:"303237200701", appId:"1:303237200701:web:97006f81f69b438f492354" };
+const g=id=>document.getElementById(id);
+const uid=()=>Math.random().toString(36).slice(2,9);
+
+function newScene(){ return {v:1,name:'meu-jogo',mode:'platformer',tile:32,gravity:1800,bg:'#0a0f0c',tileColor:'#3a5d44',grid:{},entities:[],assets:[],layers:[{id:'L1',name:'Cenário',visible:true},{id:'L2',name:'Objetos',visible:true}],active:'L2'}; }
+let SC=newScene();
+let sel=null, tool='select', placeAsset=null;
+let cam={x:-60,y:-60,z:1};
+let showGrid=true, snap=true;
+const Keys={};
+let RUN=null, saveT=null;
+
+/* ============ ASSETS ============ */
+function frameCanvas(fr,w,h){ const c=document.createElement('canvas'); c.width=w;c.height=h; const x=c.getContext('2d'); const im=x.createImageData(w,h);
+  for(let i=0;i<w*h;i++){ const hex=fr&&fr[i]; if(!hex)continue; im.data[i*4]=parseInt(hex.slice(1,3),16); im.data[i*4+1]=parseInt(hex.slice(3,5),16); im.data[i*4+2]=parseInt(hex.slice(5,7),16); im.data[i*4+3]=255; }
+  x.putImageData(im,0,0); return c; }
+function computeBBox(clips,w,h){ let mnx=w,mny=h,mxx=-1,mxy=-1; for(const cn in clips) for(const fr of clips[cn]) for(let i=0;i<w*h;i++){ if(fr&&fr[i]){ const x=i%w,y=(i/w)|0; if(x<mnx)mnx=x; if(x>mxx)mxx=x; if(y<mny)mny=y; if(y>mxy)mxy=y; } }
+  if(mxx<0) return {x:0,y:0,w:w,h:h}; return {x:mnx,y:mny,w:mxx-mnx+1,h:mxy-mny+1}; }
+function buildAsset(raw,name,id){ const w=raw.w||32,h=raw.h||32; let clips=(raw.clips&&Object.keys(raw.clips).length)?raw.clips:{ 'default':(raw.frames&&raw.frames.length?raw.frames:[new Array(w*h).fill('')]) };
+  const a={ id:id||('a'+uid()), name:name||raw.name||'art', w:w, h:h, raw:{w:w,h:h,clips:clips}, clips:{}, clipNames:[] };
+  for(const cn in clips){ a.clipNames.push(cn); const arr=clips[cn]||[]; const out=[]; for(let i=0;i<arr.length;i++) out.push(frameCanvas(arr[i],w,h)); if(!out.length)out.push(frameCanvas(null,w,h)); a.clips[cn]=out; }
+  a.bbox=computeBBox(clips,w,h); return a; }
+function assetById(id){ return SC.assets.find(a=>a.id===id); }
+function clipScore(a,name){ const fs=a.raw.clips[name]||[]; let ne=0; for(const fr of fs){ if(fr&&fr.some(x=>x))ne++; } return fs.length?ne/fs.length:0; }
+function pickDefaultClip(a){ const pref=['idle','parado','idle-parado','linha-1']; for(const p of pref){ if(a.clips[p]&&clipScore(a,p)>0.3)return p; } let best=a.clipNames[0],bs=-1; for(const n of a.clipNames){ const s=clipScore(a,n); if(s>bs){bs=s;best=n;} } return best; }
+function addAsset(raw,name){ if(!SC.assets.some(a=>a.name===(name||raw.name) && JSON.stringify(a.raw)===JSON.stringify({w:raw.w,h:raw.h,clips:(raw.clips&&Object.keys(raw.clips).length)?raw.clips:{default:raw.frames}}))){} const a=buildAsset(raw,name); SC.assets.push(a); renderAssets(); touch(); return a; }
+
+function addEntity(assetId,wx,wy){ const a=assetById(assetId); const e={ id:'e'+uid(), name:(a?a.name:'obj'), x:wx, y:wy, asset:assetId, clip:(a?pickDefaultClip(a):'default'), scale:2, fps:10, flip:false, layer:(SC.active||(SC.layers[SC.layers.length-1]||{}).id), behaviors:[], script:'' }; SC.entities.push(e); touch(); return e; }
+
+/* ============ CÂMERA / DRAW ============ */
+const cv=g('game'); const cx=cv.getContext('2d');
+function resize(){ const r=g('stage').getBoundingClientRect(); cv.width=Math.max(1,Math.round(r.width)); cv.height=Math.max(1,Math.round(r.height)); draw(); }
+function w2s(x,y){ return [(x-cam.x)*cam.z,(y-cam.y)*cam.z]; }
+function s2w(sx,sy){ return [sx/cam.z+cam.x, sy/cam.z+cam.y]; }
+
+function draw(){ cx.setTransform(1,0,0,1,0,0); cx.fillStyle=SC.bg; cx.fillRect(0,0,cv.width,cv.height); cx.imageSmoothingEnabled=false;
+  const T=SC.tile; const a0=s2w(0,0), a1=s2w(cv.width,cv.height);
+  const c0=Math.floor(a0[0]/T)-1,c1=Math.floor(a1[0]/T)+1,r0=Math.floor(a0[1]/T)-1,r1=Math.floor(a1[1]/T)+1;
+  cx.fillStyle=SC.tileColor;
+  for(let ry=r0;ry<=r1;ry++) for(let rx=c0;rx<=c1;rx++){ if(SC.grid[rx+','+ry]){ const p=w2s(rx*T,ry*T); cx.fillRect(Math.floor(p[0]),Math.floor(p[1]),Math.ceil(T*cam.z)+1,Math.ceil(T*cam.z)+1); } }
+  if(showGrid && !RUN){ cx.strokeStyle='rgba(255,255,255,.06)'; cx.lineWidth=1;
+    for(let rx=c0;rx<=c1;rx++){ const p=w2s(rx*T,0); cx.beginPath();cx.moveTo(Math.floor(p[0])+.5,0);cx.lineTo(Math.floor(p[0])+.5,cv.height);cx.stroke(); }
+    for(let ry=r0;ry<=r1;ry++){ const p=w2s(0,ry*T); cx.beginPath();cx.moveTo(0,Math.floor(p[1])+.5);cx.lineTo(cv.width,Math.floor(p[1])+.5);cx.stroke(); }
+    cx.strokeStyle='rgba(127,255,212,.35)'; cx.beginPath(); const ox=w2s(0,0); cx.moveTo(Math.floor(ox[0])+.5,0);cx.lineTo(Math.floor(ox[0])+.5,cv.height); cx.moveTo(0,Math.floor(ox[1])+.5);cx.lineTo(cv.width,Math.floor(ox[1])+.5); cx.stroke(); }
+  const list=RUN?RUN.ents:SC.entities; drawLayered(list);
+  if(!RUN && sel){ const a=assetById(sel.asset); const sw=(a?a.w:16)*sel.scale, sh=(a?a.h:16)*sel.scale; const p=w2s(sel.x,sel.y); cx.strokeStyle='#7FFFD4'; cx.lineWidth=2; cx.strokeRect(p[0],p[1],sw*cam.z,sh*cam.z);
+    if(a){ const p2=w2s(sel.x+a.bbox.x*sel.scale, sel.y+a.bbox.y*sel.scale); cx.strokeStyle='rgba(212,175,55,.6)'; cx.lineWidth=1; cx.strokeRect(p2[0],p2[1],a.bbox.w*sel.scale*cam.z,a.bbox.h*sel.scale*cam.z); } }
+}
+function drawLayered(list){ const layers=(SC.layers&&SC.layers.length)?SC.layers:[{id:'_',visible:true}]; const ids=layers.map(l=>l.id); const last=ids[ids.length-1];
+  for(const L of layers){ if(L.visible===false)continue; for(const e of list){ const lid=ids.indexOf(e.layer)>=0?e.layer:last; if(lid===L.id) drawEntity(e); } } }
+function drawEntity(e){ const a=assetById(e.asset); if(!a)return; const clip=a.clips[e.clip]||a.clips[a.clipNames[0]]; if(!clip||!clip.length)return;
+  const fi=RUN?(Math.floor(e._t*(e.fps||10))%clip.length):0; const fr=clip[fi]; if(!fr||!fr.width)return; const sc=e.scale*cam.z;
+  let dx,dy; if(RUN){ dx=e.x-a.bbox.x*e.scale; dy=e.y-a.bbox.y*e.scale; } else { dx=e.x; dy=e.y; }
+  const p=w2s(dx,dy); cx.save(); cx.translate(p[0],p[1]); cx.imageSmoothingEnabled=false;
+  if(e.flip){ cx.translate(a.w*sc,0); cx.scale(-1,1); }
+  cx.drawImage(fr,0,0,a.w*sc,a.h*sc); cx.restore(); }
+/* ============ INPUT ============ */
+const Input={ get left(){return !!(Keys['ArrowLeft']||Keys['KeyA']);}, get right(){return !!(Keys['ArrowRight']||Keys['KeyD']);},
+  get up(){return !!(Keys['ArrowUp']||Keys['KeyW']);}, get down(){return !!(Keys['ArrowDown']||Keys['KeyS']);},
+  get jump(){return !!(Keys['Space']||Keys['ArrowUp']||Keys['KeyW']);}, get action(){return !!(Keys['KeyJ']||Keys['KeyZ']);},
+  key(c){return !!Keys[c];} };
+function keyDown(e){ Keys[e.code]=true; if(e.code==='Escape'){stopPlay();return;} if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].indexOf(e.code)>=0)e.preventDefault(); }
+function keyUp(e){ Keys[e.code]=false; }
+
+/* ============ FÍSICA ============ */
+function solid(cxk,cyk){ return !!SC.grid[cxk+','+cyk]; }
+function collideX(e){ const T=SC.tile; const y0=Math.floor(e.y/T), y1=Math.floor((e.y+e.h-0.01)/T);
+  if(e.vx>0){ const cxr=Math.floor((e.x+e.w-0.01)/T); for(let cy=y0;cy<=y1;cy++) if(solid(cxr,cy)){ e.x=cxr*T-e.w; e.vx=0; break; } }
+  else if(e.vx<0){ const cxl=Math.floor(e.x/T); for(let cy=y0;cy<=y1;cy++) if(solid(cxl,cy)){ e.x=(cxl+1)*T; e.vx=0; break; } } }
+function collideY(e){ const T=SC.tile; const x0=Math.floor(e.x/T), x1=Math.floor((e.x+e.w-0.01)/T);
+  if(e.vy>0){ const cyb=Math.floor((e.y+e.h-0.01)/T); for(let c=x0;c<=x1;c++) if(solid(c,cyb)){ e.y=cyb*T-e.h; e.vy=0; e.onGround=true; break; } }
+  else if(e.vy<0){ const cyt=Math.floor(e.y/T); for(let c=x0;c<=x1;c++) if(solid(c,cyt)){ e.y=(cyt+1)*T; e.vy=0; break; } } }
+function moveE(e,dt){ e.x+=e.vx*dt; collideX(e); e.onGround=false; e.y+=e.vy*dt; collideY(e); }
+function overlap(a,b){ return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y; }
+function hasClip(e,c){ const a=assetById(e.asset); return !!(a&&a.clips[c]); }
+function autoClip(e,names){ if(e._lockUntil&&RUN&&RUN.t<e._lockUntil)return; const a=assetById(e.asset); if(!a)return; for(const n of names){ if(a.clips[n]){ if(e.clip!==n){e.clip=n;e._t=0;} return; } } }
+function respawn(e){ e.x=e.startX; e.y=e.startY; e.vx=0; e.vy=0; }
+
+/* ============ COMPORTAMENTOS ============ */
+const KEY_OPTS=[['KeyJ','J'],['KeyK','K'],['KeyL','L'],['KeyZ','Z'],['KeyX','X'],['KeyC','C'],['KeyE','E'],['KeyQ','Q'],['KeyF','F'],['KeyR','R'],['Space','Espaço'],['ShiftLeft','Shift'],['Enter','Enter'],['ArrowUp','Seta ↑'],['ArrowDown','Seta ↓'],['ArrowLeft','Seta ←'],['ArrowRight','Seta →'],['Digit1','1'],['Digit2','2'],['Digit3','3'],['Digit4','4']];
+const BEH_DEF={
+  'keys':{label:'Tecla → Animação',params:{rules:[]}},
+  'player-platformer':{label:'Player Plataforma',params:{speed:200,jump:560}},
+  'player-topdown':{label:'Player Top-down',params:{speed:160}},
+  'patrol':{label:'Patrulha (horizontal)',params:{speed:60,dist:96}},
+  'follow':{label:'Perseguir player',params:{speed:90,range:320}},
+  'collectible':{label:'Coletável',params:{value:1}},
+  'hazard':{label:'Perigo (machuca)',params:{}}
+};
+const BEH={
+  'player-platformer':(e,p,dt)=>{ const sp=+p.speed||200, jp=+p.jump||560; e.vx=(Input.right?sp:0)-(Input.left?sp:0); e.vy+=SC.gravity*dt; if(Input.jump&&e.onGround)e.vy=-jp; moveE(e,dt);
+    if(e.vx<0)e.flip=true; else if(e.vx>0)e.flip=false; autoClip(e, !e.onGround?['pular','jump','idle']:(e.vx!==0?['correr','andar','andar-dir','walk']:['idle','parado'])); if(e.y>6000)respawn(e); },
+  'player-topdown':(e,p,dt)=>{ const sp=+p.speed||160; let dx=(Input.right?1:0)-(Input.left?1:0), dy=(Input.down?1:0)-(Input.up?1:0); if(dx&&dy){dx*=Math.SQRT1_2;dy*=Math.SQRT1_2;} e.vx=dx*sp; e.vy=dy*sp; moveE(e,dt);
+    let c; if(dy>0)c=['andar-baixo','andar','walk']; else if(dy<0)c=['andar-cima','andar','walk']; else if(dx>0){c=['andar-dir','andar','walk'];e.flip=false;} else if(dx<0){ if(hasClip(e,'andar-esq')){c=['andar-esq'];e.flip=false;}else{c=['andar-dir','andar','walk'];e.flip=true;} } else c=['idle','parado']; autoClip(e,c); },
+  'patrol':(e,p,dt)=>{ const sp=+p.speed||60, dist=+p.dist||96; if(e.state._o===undefined){e.state._o=e.x;e.state._d=1;} e.vx=sp*e.state._d; if(SC.mode==='platformer')e.vy+=SC.gravity*dt; moveE(e,dt);
+    if(Math.abs(e.x-e.state._o)>=dist||e.vx===0){ e.state._d*=-1; e.state._o=e.x; } e.flip=e.state._d<0; autoClip(e,['andar','andar-dir','walk','idle']); },
+  'follow':(e,p,dt)=>{ const sp=+p.speed||90, rng=+p.range||320; const pl=RUN.player; if(pl){ const ddx=pl.x-e.x, ddy=pl.y-e.y, d=Math.hypot(ddx,ddy);
+      if(d<rng&&d>1){ if(SC.mode==='topdown'){e.vx=ddx/d*sp;e.vy=ddy/d*sp;} else {e.vx=Math.sign(ddx)*sp;e.vy+=SC.gravity*dt;} } else { e.vx=0; if(SC.mode==='platformer')e.vy+=SC.gravity*dt; } }
+    moveE(e,dt); if(e.vx)e.flip=e.vx<0; autoClip(e,['andar','correr','andar-dir','walk','idle']); },
+  'collectible':(e,p,dt)=>{ const pl=RUN.player; if(pl&&overlap(e,pl)){ e.dead=true; RUN.score=(RUN.score||0)+(+p.value||1); logMsg('Coletado! Pontos: '+RUN.score); } },
+  'hazard':(e,p,dt)=>{ const pl=RUN.player; if(pl&&overlap(e,pl)){ respawn(pl); logMsg('Encostou no perigo — voltou ao início.'); } },
+  'keys':(e,p,dt)=>{ const rules=p.rules||[]; if(!e.state._kp)e.state._kp={};
+    rules.forEach((r,i)=>{ if(!r.key)return; const down=Input.key(r.key); const was=e.state._kp[i]; e.state._kp[i]=down; const jp=down&&!was;
+      if(r.clip){ if(r.mode==='hold'){ if(down) setLockClip(e,r.clip,0.07); } else if(jp){ setLockClip(e,r.clip,clipDur(e,r.clip)); } }
+      if(jp&&r.act==='jump'&&e.onGround) e.vy=-560;
+    }); }
+};
+function clipDur(e,c){ const a=assetById(e.asset); const fs=a&&a.clips[c]; return fs?Math.max(0.15,fs.length/(e.fps||10)):0.3; }
+function setLockClip(e,c,dur){ e._lockUntil=RUN.t+dur; if(e.clip!==c){e.clip=c;e._t=0;} }
+/* ============ IA / EXEMPLOS DE CÓDIGO ============ */
+const EX_LABELS={'plataforma-movel':'Plataforma móvel (vai e volta)','segue-x':'Segue o player (eixo X)','olha-player':'Olha para o player (flip)','pulo-duplo':'Pulo duplo','flutua':'Flutua no lugar','persegue-pula':'Persegue e pula obstáculos','coleta-pontos':'Some ao encostar no player'};
+const EXAMPLES={
+'plataforma-movel':`// Plataforma que vai e volta na horizontal
+if(this.state.o===undefined){ this.state.o=this.x; this.state.d=1; }
+this.vx=80*this.state.d; this.move();
+if(Math.abs(this.x-this.state.o)>160) this.state.d*=-1;`,
+'segue-x':`// Segue o player no eixo X
+var p=this.player();
+if(p){ this.vx=Math.sign(p.x-this.x)*120;
+  if(this.mode!=='topdown') this.vy+=this.gravity*dt;
+  this.move(); this.flip=this.vx<0; }`,
+'olha-player':`// Vira para o lado do player
+var p=this.player(); if(p) this.flip = p.x < this.x;`,
+'pulo-duplo':`// Pulo duplo (combine com "Player Plataforma")
+if(this.onGround) this.state.jumps=2;
+if(this.input.jump && !this.state.was && this.state.jumps>0){ this.vy=-520; this.state.jumps--; }
+this.state.was=this.input.jump;`,
+'flutua':`// Flutua suavemente no lugar
+if(this.state.y0===undefined) this.state.y0=this.y;
+this.state.t=(this.state.t||0)+dt;
+this.y=this.state.y0+Math.sin(this.state.t*3)*20;`,
+'persegue-pula':`// Persegue o player e pula obstáculos
+var p=this.player();
+if(p){ this.vx=Math.sign(p.x-this.x)*100; this.vy+=this.gravity*dt;
+  if(this.onGround && this.solidAt(this.x+(this.vx>0?this.w+2:-2), this.y+this.h-2)) this.vy=-480;
+  this.move(); this.flip=this.vx<0; }`,
+'coleta-pontos':`// Some quando o player encostar
+var p=this.player();
+if(p && p.x<this.x+this.w && p.x+p.w>this.x && p.y<this.y+this.h && p.y+p.h>this.y){
+  this.log('coletado!'); this.destroy();
+}`
+};
+const AICode={
+  ex(v){ if(!v)return; const t=g('inScript'); if(t){ t.value=EXAMPLES[v]||''; } g('aiCodeMsg').textContent='Exemplo inserido. Clique em "Aplicar script".'; },
+  gen(){ const p=(g('aiCodePrompt').value||'').trim(); if(!p){ g('aiCodeMsg').textContent='Descreva o que o objeto deve fazer.'; return; }
+    g('aiCodeMsg').textContent='Gerando código com IA (precisa de internet)...';
+    const sys='Voce escreve APENAS o corpo de uma funcao update(dt) em JavaScript para um motor de jogo 2D. Use this para o objeto: propriedades this.x,this.y,this.vx,this.vy,this.w,this.h,this.onGround,this.flip,this.state (objeto livre p/ guardar dados),this.input (left,right,up,down,jump,action,key(code)),this.gravity,this.mode,this.tile. Metodos: this.move(), this.play("clip"), this.solidAt(x,y), this.find("nome"), this.player(), this.destroy(), this.log(msg). Em jogo de plataforma faca this.vy+=this.gravity*dt antes de this.move(). NAO use import, require, DOM, window, fetch, setTimeout nem markdown. Responda SOMENTE com codigo JavaScript puro. Tarefa: ';
+    fetch('https://text.pollinations.ai/'+encodeURIComponent(sys+p)).then(r=>r.text()).then(txt=>{ let code=(txt||'').trim(); code=code.replace(/^```[a-zA-Z]*\s*/,'').replace(/```\s*$/,'').trim();
+      if(!code){ g('aiCodeMsg').textContent='IA não retornou código. Tente reescrever ou use exemplos.'; return; }
+      const t=g('inScript'); if(t)t.value=code;
+      try{ new Function('dt',code); g('aiCodeMsg').textContent='Código gerado! Revise e clique em "Aplicar script".'; }
+      catch(err){ g('aiCodeMsg').textContent='IA respondeu mas há um erro pra revisar: '+err.message; }
+    }).catch(()=>{ g('aiCodeMsg').textContent='Sem internet ou IA fora do ar. Use os exemplos prontos (funcionam offline).'; }); }
+};
+
+/* ============ API DE SCRIPT ============ */
+function apiFor(e){ if(e._api){return e._api;} const s=e; e._api={
+    get x(){return s.x;}, set x(v){s.x=v;}, get y(){return s.y;}, set y(v){s.y=v;},
+    get vx(){return s.vx;}, set vx(v){s.vx=v;}, get vy(){return s.vy;}, set vy(v){s.vy=v;},
+    get w(){return s.w;}, get h(){return s.h;}, get onGround(){return s.onGround;}, get name(){return s.name;},
+    get flip(){return s.flip;}, set flip(v){s.flip=v;}, state:s.state, input:Input, gravity:SC.gravity, mode:SC.mode, tile:SC.tile,
+    move(){ moveE(s,RUN.dt); }, play(c){ if(hasClip(s,c)&&s.clip!==c){s.clip=c;s._t=0;} },
+    solidAt(wx,wy){ return solid(Math.floor(wx/SC.tile),Math.floor(wy/SC.tile)); },
+    find(nm){ return RUN.ents.find(z=>z.name===nm&&!z.dead)&&RUN.ents.find(z=>z.name===nm&&!z.dead)._api; },
+    player(){ return RUN.player&&RUN.player._api; }, overlaps(o){ return o&&overlap(s, o.__e||o); },
+    destroy(){ s.dead=true; }, log(m){ logMsg(''+m); } };
+  e._api.__e=s; return e._api; }
+
+/* ============ PLAY / LOOP ============ */
+function startPlay(){ if(RUN)return; if(!SC.entities.length){ logMsg('Adicione ao menos um objeto e dê um comportamento de Player.'); }
+  const ents=SC.entities.map(e=>{ const a=assetById(e.asset); const bb=a?a.bbox:{x:0,y:0,w:16,h:16};
+    const rt={ id:e.id,name:e.name,asset:e.asset,clip:e.clip,fps:e.fps,scale:e.scale,flip:e.flip,
+      x:e.x+bb.x*e.scale, y:e.y+bb.y*e.scale, w:Math.max(2,bb.w*e.scale), h:Math.max(2,bb.h*e.scale),
+      vx:0,vy:0,onGround:false,_t:0, behaviors:(e.behaviors||[]).map(b=>({type:b.type,params:Object.assign({},b.params)})), script:e.script||'', state:{}, dead:false };
+    rt.startX=rt.x; rt.startY=rt.y;
+    if(rt.script.trim()){ try{ rt._fn=new Function('dt', rt.script); }catch(err){ logMsg('⚠ Sintaxe no script de "'+rt.name+'": '+err.message); rt._fn=null; } }
+    return rt; });
+  RUN={ ents:ents, player:null, t:0, dt:0, score:0 };
+  RUN.player=ents.find(e=>e.behaviors.some(b=>b.type==='player-platformer'||b.type==='player-topdown'))||null;
+  if(!RUN.player) logMsg('Dica: nenhum objeto tem comportamento de Player. Selecione um objeto e adicione "Player Plataforma" ou "Player Top-down" para controlá-lo e a câmera segui-lo.');
+  g('btnPlay').classList.add('hide'); g('btnStop').classList.remove('hide');
+  window.addEventListener('keydown',keyDown); window.addEventListener('keyup',keyUp);
+  RUN.last=performance.now(); RUN.raf=requestAnimationFrame(loop);
+  logMsg('▶ Jogando — Setas/WASD = mover, Espaço/↑ = pular, J = ação, Esc = parar.'); }
+function stopPlay(){ if(!RUN)return; cancelAnimationFrame(RUN.raf); window.removeEventListener('keydown',keyDown); window.removeEventListener('keyup',keyUp); RUN=null; for(const k in Keys)delete Keys[k]; g('btnPlay').classList.remove('hide'); g('btnStop').classList.add('hide'); draw(); }
+function loop(now){ if(!RUN)return; const dt=Math.min(0.05,(now-RUN.last)/1000); RUN.last=now; RUN.t+=dt; RUN.dt=dt;
+  try{
+    for(const e of RUN.ents){ if(e.dead)continue; e._t+=dt;
+      for(const b of e.behaviors){ const f=BEH[b.type]; if(f)f(e,b.params,dt); }
+      if(e._fn){ try{ e._fn.call(apiFor(e),dt); }catch(err){ logMsg('⚠ Script "'+e.name+'": '+err.message); e._fn=null; } } }
+    RUN.ents=RUN.ents.filter(e=>!e.dead); if(RUN.player&&RUN.player.dead)RUN.player=null;
+    if(RUN.player){ cam.x=(RUN.player.x+RUN.player.w/2)-cv.width/(2*cam.z); cam.y=(RUN.player.y+RUN.player.h/2)-cv.height/(2*cam.z); }
+    draw();
+  }catch(err){ logMsg('⚠ Erro no jogo: '+err.message); }
+  if(RUN)RUN.raf=requestAnimationFrame(loop); }
+/* ============ LOG ============ */
+function logMsg(m){ const l=g('log'); l.textContent+=(l.textContent?'\n':'')+m; l.scrollTop=l.scrollHeight; }
+function esc(s){ return (''+s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ============ FERRAMENTAS ============ */
+const TOOLS=[['select','✦ Selecionar'],['tiles','▦ Plataforma'],['erase','▢ Apagar tile'],['place','＋ Colocar'],['pan','✋ Mover câmera']];
+const HINTS={select:'Clique para selecionar e arraste para mover. Fundo vazio = arrasta a câmera.',tiles:'Clique/arraste para pintar plataformas. Botão direito apaga.',erase:'Clique/arraste para apagar tiles.',place:'Escolha um objeto na biblioteca e clique na cena para colocar.',pan:'Arraste para mover a câmera. Roda do mouse = zoom.'};
+function buildTools(){ const w=g('toolBtns'); w.innerHTML=''; TOOLS.forEach(t=>{ const b=document.createElement('button'); b.textContent=t[1]; b.dataset.t=t[0]; if(t[0]===tool)b.className='on'; b.onclick=()=>setTool(t[0]); w.appendChild(b); }); }
+function setTool(t){ tool=t; buildTools(); g('toolHint').textContent=HINTS[t]||''; }
+
+/* ============ MOUSE NA CENA ============ */
+let drag=null;
+function evPos(e){ const r=cv.getBoundingClientRect(); return [e.clientX-r.left,e.clientY-r.top]; }
+cv.addEventListener('pointerdown',e=>{ if(RUN)return; cv.setPointerCapture(e.pointerId); const sp=evPos(e); const wp=s2w(sp[0],sp[1]);
+  if(tool==='pan'||e.button===1){ drag={t:'pan',sx:sp[0],sy:sp[1],cx:cam.x,cy:cam.y}; return; }
+  if(tool==='tiles'){ const v=e.button===2?0:1; paintTile(wp[0],wp[1],v); drag={t:'paint',v:v}; return; }
+  if(tool==='erase'){ paintTile(wp[0],wp[1],0); drag={t:'paint',v:0}; return; }
+  if(tool==='place'){ if(!placeAsset){ logMsg('Escolha um objeto na biblioteca primeiro.'); return; } let px=wp[0],py=wp[1]; if(snap){px=Math.floor(wp[0]/SC.tile)*SC.tile;py=Math.floor(wp[1]/SC.tile)*SC.tile;} select(addEntity(placeAsset,px,py)); draw(); return; }
+  let hit=null; for(let i=SC.entities.length-1;i>=0;i--){ const en=SC.entities[i],a=assetById(en.asset); const sw=(a?a.w:16)*en.scale,sh=(a?a.h:16)*en.scale; if(wp[0]>=en.x&&wp[0]<=en.x+sw&&wp[1]>=en.y&&wp[1]<=en.y+sh){hit=en;break;} }
+  if(hit){ select(hit); drag={t:'move',ent:hit,ox:wp[0]-hit.x,oy:wp[1]-hit.y}; } else { select(null); drag={t:'pan',sx:sp[0],sy:sp[1],cx:cam.x,cy:cam.y}; } });
+cv.addEventListener('pointermove',e=>{ if(RUN||!drag)return; const sp=evPos(e); const wp=s2w(sp[0],sp[1]);
+  if(drag.t==='pan'){ cam.x=drag.cx-(sp[0]-drag.sx)/cam.z; cam.y=drag.cy-(sp[1]-drag.sy)/cam.z; draw(); }
+  else if(drag.t==='paint'){ paintTile(wp[0],wp[1],drag.v); }
+  else if(drag.t==='move'){ let nx=wp[0]-drag.ox, ny=wp[1]-drag.oy; if(snap){ const s=SC.tile/2; nx=Math.round(nx/s)*s; ny=Math.round(ny/s)*s; } drag.ent.x=nx; drag.ent.y=ny; if(sel===drag.ent)syncInspPos(); draw(); } });
+cv.addEventListener('pointerup',()=>{ if(drag&&(drag.t==='move'||drag.t==='paint'))touch(); drag=null; });
+cv.addEventListener('contextmenu',e=>e.preventDefault());
+cv.addEventListener('wheel',e=>{ if(RUN)return; e.preventDefault(); const sp=evPos(e); const wp=s2w(sp[0],sp[1]); cam.z=Math.max(.2,Math.min(6,cam.z*(e.deltaY<0?1.1:0.9))); const np=w2s(wp[0],wp[1]); cam.x+=(np[0]-sp[0])/cam.z; cam.y+=(np[1]-sp[1])/cam.z; draw(); },{passive:false});
+function paintTile(wx,wy,v){ const k=Math.floor(wx/SC.tile)+','+Math.floor(wy/SC.tile); if(v)SC.grid[k]=1; else delete SC.grid[k]; draw(); }
+
+/* ============ BIBLIOTECA ============ */
+function renderAssets(){ const w=g('assetList'); if(!SC.assets.length){ w.innerHTML='<p class="note">Nenhuma arte ainda. Importe abaixo.</p>'; return; } w.innerHTML='';
+  SC.assets.forEach(a=>{ const d=document.createElement('div'); d.className='asset'+(placeAsset===a.id?' sel':''); const c=document.createElement('canvas'); c.width=34;c.height=34; const ctx=c.getContext('2d'); ctx.imageSmoothingEnabled=false; const f=a.clips[a.clipNames[0]][0]; const s=Math.min(34/a.w,34/a.h); ctx.drawImage(f,(34-a.w*s)/2,(34-a.h*s)/2,a.w*s,a.h*s);
+    const nm=document.createElement('div'); nm.className='nm'; nm.textContent=a.name; const x=document.createElement('button'); x.textContent='✕'; x.style.padding='2px 6px'; x.onclick=ev=>{ev.stopPropagation(); SC.assets=SC.assets.filter(z=>z!==a); if(placeAsset===a.id)placeAsset=null; renderAssets(); touch();};
+    d.appendChild(c); d.appendChild(nm); d.appendChild(x); d.onclick=()=>{ placeAsset=a.id; setTool('place'); renderAssets(); }; w.appendChild(d); }); }
+
+function renderLayers(){ const w=g('layerList'); if(!w)return; w.innerHTML=''; SC.layers.forEach((L,i)=>{ const d=document.createElement('div'); d.className='asset'+(SC.active===L.id?' sel':'');
+    d.innerHTML='<button data-v="'+i+'" title="visível" style="padding:2px 6px">'+(L.visible===false?'🚫':'👁')+'</button><input class="lnm" data-i="'+i+'" value="'+esc(L.name)+'" style="flex:1"><button data-u="'+i+'" style="padding:2px 5px">▲</button><button data-d="'+i+'" style="padding:2px 5px">▼</button><button data-x="'+i+'" class="danger" style="padding:2px 6px">✕</button>';
+    d.onclick=ev=>{ if(ev.target.tagName==='INPUT'||ev.target.tagName==='BUTTON')return; SC.active=L.id; renderLayers(); };
+    w.appendChild(d); });
+  w.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{ const L=SC.layers[+b.dataset.v]; L.visible=(L.visible===false); renderLayers(); draw(); touch(); });
+  w.querySelectorAll('.lnm').forEach(inp=>inp.oninput=()=>{ SC.layers[+inp.dataset.i].name=inp.value; touch(); });
+  w.querySelectorAll('[data-u]').forEach(b=>b.onclick=()=>{ const i=+b.dataset.u; if(i>0){ const t=SC.layers[i-1];SC.layers[i-1]=SC.layers[i];SC.layers[i]=t; renderLayers(); draw(); touch(); } });
+  w.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{ const i=+b.dataset.d; if(i<SC.layers.length-1){ const t=SC.layers[i+1];SC.layers[i+1]=SC.layers[i];SC.layers[i]=t; renderLayers(); draw(); touch(); } });
+  w.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{ if(SC.layers.length<=1)return; const id=SC.layers[+b.dataset.x].id; SC.layers.splice(+b.dataset.x,1); SC.entities.forEach(e=>{ if(e.layer===id)e.layer=SC.layers[SC.layers.length-1].id; }); if(SC.active===id)SC.active=SC.layers[SC.layers.length-1].id; renderLayers(); refreshInspector(); draw(); touch(); }); }
+
+/* ============ INSPETOR ============ */
+function select(e){ sel=e; refreshInspector(); draw(); }
+function syncInspPos(){ const xi=g('inX'),yi=g('inY'); if(xi)xi.value=Math.round(sel.x); if(yi)yi.value=Math.round(sel.y); }
+function refreshInspector(){ const w=g('insp'); if(!sel){ w.innerHTML='<p class="note">Selecione um objeto na cena (ferramenta Selecionar).</p>'; return; } const a=assetById(sel.asset);
+  let h='<label>Nome</label><input id="inName" value="'+esc(sel.name)+'">';
+  h+='<div class="grid2" style="margin-top:6px"><div><label>X</label><input type="number" id="inX" value="'+Math.round(sel.x)+'"></div><div><label>Y</label><input type="number" id="inY" value="'+Math.round(sel.y)+'"></div></div>';
+  h+='<div class="grid2" style="margin-top:6px"><div><label>Escala</label><input type="number" id="inScale" step="0.5" value="'+sel.scale+'"></div><div><label>FPS anim</label><input type="number" id="inFps" value="'+sel.fps+'"></div></div>';
+  h+='<label style="margin-top:6px">Animação</label><select id="inClip">'+(a?a.clipNames.map(c=>'<option'+(c===sel.clip?' selected':'')+'>'+esc(c)+'</option>').join(''):'')+'</select>';
+  h+='<label class="row" style="margin-top:6px"><input type="checkbox" id="inFlip"'+(sel.flip?' checked':'')+'> espelhar</label>';
+  h+='<label style="margin-top:6px">Camada</label><select id="inLayer">'+SC.layers.map(L=>'<option value="'+L.id+'"'+((sel.layer||SC.active)===L.id?' selected':'')+'>'+esc(L.name)+'</option>').join('')+'</select>';
+  h+='<h3 style="margin-top:10px;color:var(--accent2);font-size:11px;text-transform:uppercase">Comportamentos</h3><div id="behs"></div>';
+  h+='<div class="row" style="margin-top:4px"><select id="behAdd"><option value="">+ adicionar...</option>'+Object.keys(BEH_DEF).map(k=>'<option value="'+k+'">'+BEH_DEF[k].label+'</option>').join('')+'</select></div>';
+  h+='<h3 style="margin-top:10px;color:var(--accent2);font-size:11px;text-transform:uppercase">Script (JS) + IA</h3>';
+  h+='<div class="row"><input id="aiCodePrompt" placeholder="descreva: ex: persegue o player e pula"><button id="aiCodeGen" class="primary" style="white-space:nowrap">✨ IA</button></div>';
+  h+='<select id="aiCodeEx" style="margin-top:4px"><option value="">↘ exemplos prontos (offline)…</option>'+Object.keys(EX_LABELS).map(k=>'<option value="'+k+'">'+esc(EX_LABELS[k])+'</option>').join('')+'</select>';
+  h+='<p class="note" id="aiCodeMsg" style="margin-top:3px"></p>';
+  h+='<textarea id="inScript" rows="8" style="margin-top:4px" placeholder="// roda todo frame. ex: this.vx=100; if(this.input.jump)this.vy=-500;">'+esc(sel.script||'')+'</textarea>';
+  h+='<div class="row" style="margin-top:6px"><button class="primary" id="inApplyScript" style="flex:1">Aplicar script</button></div>';
+  h+='<button class="danger" id="inDel" style="width:100%;margin-top:8px">🗑 Apagar objeto</button>';
+  w.innerHTML=h; renderBehs();
+  g('inName').oninput=e=>{sel.name=e.target.value;touch();};
+  g('inX').oninput=e=>{sel.x=+e.target.value;draw();touch();}; g('inY').oninput=e=>{sel.y=+e.target.value;draw();touch();};
+  g('inScale').oninput=e=>{sel.scale=Math.max(.25,+e.target.value||1);draw();touch();}; g('inFps').oninput=e=>{sel.fps=Math.max(1,+e.target.value||10);touch();};
+  g('inClip').onchange=e=>{sel.clip=e.target.value;draw();touch();}; g('inFlip').onchange=e=>{sel.flip=e.target.checked;draw();touch();}; g('inLayer').onchange=e=>{sel.layer=e.target.value;draw();touch();};
+  g('behAdd').onchange=e=>{ if(e.target.value){ sel.behaviors.push({type:e.target.value,params:Object.assign({},BEH_DEF[e.target.value].params)}); refreshInspector(); touch(); } };
+  g('inApplyScript').onclick=()=>{ sel.script=g('inScript').value; try{ if(sel.script.trim())new Function('dt',sel.script); logMsg('Script de "'+sel.name+'" salvo.'); }catch(err){ logMsg('⚠ Erro no script: '+err.message); } touch(); };
+  g('aiCodeGen').onclick=()=>AICode.gen(); g('aiCodeEx').onchange=e=>AICode.ex(e.target.value);
+  g('inDel').onclick=()=>{ SC.entities=SC.entities.filter(z=>z!==sel); select(null); touch(); };
+}
+function renderBehs(){ const w=g('behs'); if(!w)return; w.innerHTML=''; const a=assetById(sel.asset); const clipOpts=(a?a.clipNames:[]);
+  sel.behaviors.forEach((b,i)=>{ const def=BEH_DEF[b.type]||{label:b.type,params:{}}; const d=document.createElement('div'); d.className='beh';
+    let ph='<div class="bt"><span>'+esc(def.label)+'</span><button data-i="'+i+'" class="rmBeh" style="padding:1px 7px">✕</button></div>';
+    if(b.type==='keys'){ if(!Array.isArray(b.params.rules))b.params.rules=[];
+      if(!b.params.rules.length) ph+='<p class="note">Sem regras. Adicione abaixo: escolha a tecla e a animação.</p>';
+      b.params.rules.forEach((r,j)=>{ ph+='<div style="border:1px solid var(--line);border-radius:5px;padding:5px;margin-bottom:5px">';
+        ph+='<div class="grid2"><div><label>Tecla</label><select class="rk" data-i="'+i+'" data-j="'+j+'">'+KEY_OPTS.map(k=>'<option value="'+k[0]+'"'+(r.key===k[0]?' selected':'')+'>'+k[1]+'</option>').join('')+'</select></div>';
+        ph+='<div><label>Animação</label><select class="rc" data-i="'+i+'" data-j="'+j+'"><option value="">—</option>'+clipOpts.map(c=>'<option'+(r.clip===c?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select></div></div>';
+        ph+='<div class="grid2" style="margin-top:4px"><div><label>Modo</label><select class="rm" data-i="'+i+'" data-j="'+j+'"><option value="once"'+(r.mode!=='hold'?' selected':'')+'>apertar (1x)</option><option value="hold"'+(r.mode==='hold'?' selected':'')+'>segurar</option></select></div>';
+        ph+='<div><label>Ação</label><select class="ra" data-i="'+i+'" data-j="'+j+'"><option value=""'+(!r.act?' selected':'')+'>nenhuma</option><option value="jump"'+(r.act==='jump'?' selected':'')+'>pular</option></select></div></div>';
+        ph+='<button class="rmRule" data-i="'+i+'" data-j="'+j+'" style="margin-top:4px;padding:2px 8px">remover regra</button></div>'; });
+      ph+='<button class="addRule" data-i="'+i+'" style="width:100%">+ regra (tecla → animação)</button>';
+    } else { const keys=Object.keys(b.params||{}).filter(k=>typeof b.params[k]==='number'); if(keys.length){ ph+='<div class="grid2">'+keys.map(k=>'<div><label>'+k+'</label><input type="number" class="behP" data-i="'+i+'" data-k="'+k+'" value="'+b.params[k]+'"></div>').join('')+'</div>'; } }
+    d.innerHTML=ph; w.appendChild(d); });
+  w.querySelectorAll('.rmBeh').forEach(btn=>btn.onclick=()=>{ sel.behaviors.splice(+btn.dataset.i,1); refreshInspector(); touch(); });
+  w.querySelectorAll('.behP').forEach(inp=>inp.oninput=()=>{ sel.behaviors[+inp.dataset.i].params[inp.dataset.k]=+inp.value; touch(); });
+  w.querySelectorAll('.addRule').forEach(btn=>btn.onclick=()=>{ sel.behaviors[+btn.dataset.i].params.rules.push({key:'KeyJ',clip:'',mode:'once',act:''}); refreshInspector(); touch(); });
+  w.querySelectorAll('.rmRule').forEach(btn=>btn.onclick=()=>{ sel.behaviors[+btn.dataset.i].params.rules.splice(+btn.dataset.j,1); refreshInspector(); touch(); });
+  const bindR=(cls,f)=>w.querySelectorAll(cls).forEach(s=>s.onchange=()=>{ sel.behaviors[+s.dataset.i].params.rules[+s.dataset.j][f]=s.value; touch(); });
+  bindR('.rk','key'); bindR('.rc','clip'); bindR('.rm','mode'); bindR('.ra','act'); }
+
+/* ============ SALVAR / CARREGAR ============ */
+function stripEnt(e){ return {id:e.id,name:e.name,x:e.x,y:e.y,asset:e.asset,clip:e.clip,scale:e.scale,fps:e.fps,flip:e.flip,layer:e.layer,behaviors:e.behaviors,script:e.script}; }
+function serializeScene(){ SC.name=g('projName').value; return {v:1,name:SC.name,mode:SC.mode,tile:SC.tile,gravity:SC.gravity,bg:SC.bg,tileColor:SC.tileColor,grid:SC.grid,layers:SC.layers,active:SC.active,entities:SC.entities.map(stripEnt),assets:SC.assets.map(a=>({id:a.id,name:a.name,raw:a.raw}))}; }
+function loadScene(o){ stopPlay(); SC=newScene(); SC.name=o.name||'meu-jogo'; SC.mode=o.mode||'platformer'; SC.tile=o.tile||32; SC.gravity=o.gravity!=null?o.gravity:1800; SC.bg=o.bg||'#0a0f0c'; SC.tileColor=o.tileColor||'#3a5d44'; SC.grid=o.grid||{};
+  SC.layers=(o.layers&&o.layers.length)?o.layers:[{id:'L1',name:'Cenário',visible:true},{id:'L2',name:'Objetos',visible:true}]; SC.active=o.active||SC.layers[SC.layers.length-1].id;
+  SC.assets=(o.assets||[]).map(a=>buildAsset(a.raw,a.name,a.id)); SC.entities=(o.entities||[]).map(e=>Object.assign({behaviors:[],script:''},e));
+  const lids=SC.layers.map(l=>l.id); SC.entities.forEach(e=>{ if(lids.indexOf(e.layer)<0)e.layer=SC.active; });
+  sel=null; placeAsset=null; syncSceneInputs(); renderAssets(); renderLayers(); refreshInspector(); cam={x:-60,y:-60,z:1}; draw(); }
+function syncSceneInputs(){ g('projName').value=SC.name; g('modeSel').value=SC.mode; g('tileSize').value=SC.tile; g('gravity').value=SC.gravity; g('bgColor').value=SC.bg; g('tileColor').value=SC.tileColor; g('gravityRow').style.display=SC.mode==='platformer'?'':'none'; }
+function touch(){ g('saveDot').textContent='salvando...'; clearTimeout(saveT); saveT=setTimeout(()=>{ try{ localStorage.setItem('game_proj',JSON.stringify(serializeScene())); }catch(e){} g('saveDot').textContent='salvo'; },500); }
+/* ============ EXPORTAR JOGO (HTML jogável) ============ */
+function buildExportHTML(){
+  const scene=serializeScene();
+  const fnList=[frameCanvas,computeBBox,buildAsset,assetById,w2s,s2w,drawLayered,drawEntity,draw,solid,collideX,collideY,moveE,overlap,hasClip,autoClip,respawn,clipDur,setLockClip,apiFor,loop];
+  const fnSrc=fnList.map(f=>f.toString()).join('\n');
+  const behSrc='const BEH={'+Object.keys(BEH).map(k=>JSON.stringify(k)+':'+BEH[k].toString()).join(',\n')+'};';
+  const inputSrc="const Input={ get left(){return !!(Keys['ArrowLeft']||Keys['KeyA']);}, get right(){return !!(Keys['ArrowRight']||Keys['KeyD']);}, get up(){return !!(Keys['ArrowUp']||Keys['KeyW']);}, get down(){return !!(Keys['ArrowDown']||Keys['KeyS']);}, get jump(){return !!(Keys['Space']||Keys['ArrowUp']||Keys['KeyW']);}, get action(){return !!(Keys['KeyJ']||Keys['KeyZ']);}, key(c){return !!Keys[c];} };";
+  const boot=`
+const SCENE=__SCENE__;
+const g=id=>document.getElementById(id); const cv=g('game'),cx=cv.getContext('2d');
+let cam={x:-60,y:-60,z:2}, RUN=null, showGrid=false; const Keys={};
+function logMsg(m){ try{console.log(m);}catch(e){} }
+let SC=SCENE; SC.assets=SCENE.assets.map(a=>buildAsset(a.raw,a.name,a.id));
+function resize(){ cv.width=window.innerWidth; cv.height=window.innerHeight; } window.addEventListener('resize',resize); resize();
+window.addEventListener('keydown',e=>{ Keys[e.code]=true; if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].indexOf(e.code)>=0)e.preventDefault(); });
+window.addEventListener('keyup',e=>{ Keys[e.code]=false; });
+const ents=SC.entities.map(e=>{ const a=assetById(e.asset); const bb=a?a.bbox:{x:0,y:0,w:16,h:16};
+  const rt={id:e.id,name:e.name,asset:e.asset,clip:e.clip,fps:e.fps,scale:e.scale,flip:e.flip,layer:e.layer,
+    x:e.x+bb.x*e.scale,y:e.y+bb.y*e.scale,w:Math.max(2,bb.w*e.scale),h:Math.max(2,bb.h*e.scale),
+    vx:0,vy:0,onGround:false,_t:0,behaviors:(e.behaviors||[]).map(b=>({type:b.type,params:JSON.parse(JSON.stringify(b.params||{}))})),script:e.script||'',state:{},dead:false};
+  rt.startX=rt.x; rt.startY=rt.y; if(rt.script.trim()){ try{ rt._fn=new Function('dt',rt.script);}catch(err){ rt._fn=null; } } return rt; });
+RUN={ents:ents,player:null,t:0,dt:0,score:0,last:performance.now()};
+RUN.player=ents.find(e=>e.behaviors.some(b=>b.type==='player-platformer'||b.type==='player-topdown'))||null;
+RUN.raf=requestAnimationFrame(loop);
+`.replace('__SCENE__', JSON.stringify(scene));
+  const op='<scr'+'ipt>'; const cl='<\/scr'+'ipt>';
+  return '<!DOCTYPE html>\n<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(scene.name||'jogo')+'</title>'+
+    '<style>html,body{margin:0;height:100%;background:'+scene.bg+';overflow:hidden}#game{display:block;width:100vw;height:100vh;image-rendering:pixelated}.hud{position:fixed;left:8px;bottom:8px;color:#9fb;font:12px system-ui;opacity:.55;pointer-events:none}</style></head>'+
+    '<body><canvas id="game"></canvas><div class="hud">Setas/WASD mover • Espaço/↑ pular • J ação</div>'+
+    op+'\n'+inputSrc+'\n'+behSrc+'\n'+fnSrc+'\n'+boot+'\n'+cl+'</body></html>';
+}
+
+/* ============ IMPORTAR ARTES ============ */
+function projFromAny(d){ const p=d&&(d.data||d.proj||d); if(p&&(p.frames||p.clips))return p; return null; }
+function importArt(p,name){ if(!p){ logMsg('Arquivo não parece uma pixel art.'); return; } addAsset(p,name||p.name); logMsg('Arte "'+(name||p.name||'art')+'" adicionada à biblioteca.'); }
+
+/* ============ FIREBASE ============ */
+let db=null,user=null,fbOk=false;
+function initFB(){ try{ firebase.initializeApp(FB); db=firebase.firestore(); fbOk=true; firebase.auth().onAuthStateChanged(u=>{ user=u; afterAuth(); }); }catch(e){ console.warn(e); g('auth-msg').textContent='Firebase indisponível — use "sem login".'; } }
+function afterAuth(){ if(user){ g('authgate').style.display='none'; g('userBox').textContent=user.email||'logado'; ['userBox','cloudBtn','profileBtn','logoutBtn'].forEach(i=>g(i).classList.remove('hide')); } }
+function login(){ if(!fbOk)return; firebase.auth().signInWithEmailAndPassword(g('au-email').value,g('au-pass').value).catch(e=>g('auth-msg').textContent=e.message); }
+function signup(){ if(!fbOk)return; firebase.auth().createUserWithEmailAndPassword(g('au-email').value,g('au-pass').value).catch(e=>g('auth-msg').textContent=e.message); }
+function logout(){ if(fbOk)firebase.auth().signOut(); ['userBox','cloudBtn','profileBtn','logoutBtn'].forEach(i=>g(i).classList.add('hide')); g('authgate').style.display='flex'; }
+function skip(){ g('authgate').style.display='none'; }
+function cloudSave(){ if(!user){ logMsg('Entre na conta para salvar na nuvem.'); return; } const data=serializeScene(); db.collection('scenes').add({uid:user.uid,name:data.name,data:data,ts:Date.now()}).then(()=>{ g('prof-msg').textContent='Salvo na nuvem!'; logMsg('☁ Jogo salvo na nuvem.'); }).catch(e=>{ g('prof-msg').textContent=e.message; logMsg('Erro ao salvar: '+e.message); }); }
+function listScenes(){ const w=g('prof-scenes'); if(!user){w.innerHTML='<p class="note">Entre para ver.</p>';return;} w.innerHTML='<p class="note">carregando...</p>'; db.collection('scenes').where('uid','==',user.uid).get().then(s=>{ if(s.empty){w.innerHTML='<p class="note">Nenhum jogo salvo.</p>';return;} w.innerHTML=''; const arr=[]; s.forEach(d=>arr.push({id:d.id,...d.data()})); arr.sort((a,b)=>(b.ts||0)-(a.ts||0)); arr.forEach(it=>{ const d=document.createElement('div'); d.className='asset'; d.innerHTML='<div class="nm">'+esc(it.name||'jogo')+'</div>'; const b=document.createElement('button'); b.textContent='abrir'; b.onclick=()=>{ loadScene(it.data); g('profile').classList.remove('open'); logMsg('Jogo "'+(it.name||'')+'" carregado.'); }; d.appendChild(b); w.appendChild(d); }); }).catch(e=>w.innerHTML='<p class="note">'+esc(e.message)+'</p>'); }
+function listArts(){ const w=g('artsList'); if(!user){w.innerHTML='<p class="note">Entre na conta para ver suas artes.</p>';return;} w.innerHTML='<p class="note">carregando...</p>'; db.collection('pixelart').where('uid','==',user.uid).get().then(s=>{ if(s.empty){w.innerHTML='<p class="note">Nenhuma arte na nuvem. Salve no Pixel Studio.</p>';return;} w.innerHTML=''; s.forEach(doc=>{ const it=doc.data(); const p=projFromAny(it); const d=document.createElement('div'); d.className='asset'; d.innerHTML='<div class="nm">'+esc((it.name)||'art')+'</div>'; const b=document.createElement('button'); b.textContent='+ usar'; b.onclick=()=>{ importArt(p,it.name); }; d.appendChild(b); w.appendChild(d); }); }).catch(e=>w.innerHTML='<p class="note">'+esc(e.message)+'</p>'); }
+
+/* ============ EDITOR DE ARTE (módulo) ============ */
+function openArtEditor(){ const f=g('artFrame'); if(!f.getAttribute('src')) f.setAttribute('src','amazonia-pixel-studio.html'); g('artEditor').style.display='flex'; }
+function closeArtEditor(){ g('artEditor').style.display='none'; }
+
+/* ============ BOOT ============ */
+function wire(){ buildTools(); setTool('select');
+  g('btnLogin').onclick=login; g('btnSignup').onclick=signup; g('btnSkip').onclick=skip; g('logoutBtn').onclick=logout;
+  g('btnPlay').onclick=startPlay; g('btnStop').onclick=stopPlay;
+  g('profileBtn').onclick=()=>{ g('prof-email').textContent=user?user.email:''; g('profile').classList.add('open'); listScenes(); };
+  g('profClose').onclick=()=>g('profile').classList.remove('open'); g('profSave').onclick=cloudSave; g('cloudBtn').onclick=cloudSave;
+  g('artsCloudBtn').onclick=()=>{ g('artsModal').classList.add('open'); listArts(); }; g('artsClose').onclick=()=>g('artsModal').classList.remove('open');
+  g('artsLocalBtn').onclick=()=>{ try{ const r=localStorage.getItem('px_proj'); if(!r){logMsg('Nada encontrado do Pixel Studio neste navegador.');return;} importArt(projFromAny(JSON.parse(r)),'pixel-studio'); }catch(e){ logMsg('Erro ao ler local: '+e.message); } };
+  g('artsFileBtn').onclick=()=>g('fileArt').click();
+  g('fileArt').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{ importArt(projFromAny(JSON.parse(r.result)), f.name.replace(/\.json$/,'')); }catch(x){ logMsg('JSON inválido.'); } }; r.readAsText(f); e.target.value=''; };
+  g('btnNew').onclick=()=>{ if(confirm('Começar um jogo novo? (o atual fica salvo localmente)')){ loadScene(newScene()); touch(); } };
+  g('btnExportJson').onclick=()=>{ const blob=new Blob([JSON.stringify(serializeScene())],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(SC.name||'jogo')+'.json'; a.click(); };
+  g('btnOpenJson').onclick=()=>g('fileScene').click();
+  g('fileScene').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{ loadScene(JSON.parse(r.result)); logMsg('Cena carregada.'); }catch(x){ logMsg('JSON inválido.'); } }; r.readAsText(f); e.target.value=''; };
+  g('projName').oninput=()=>touch();
+  g('modeSel').onchange=e=>{ SC.mode=e.target.value; g('gravityRow').style.display=SC.mode==='platformer'?'':'none'; touch(); };
+  g('tileSize').oninput=e=>{ SC.tile=Math.max(8,+e.target.value||32); draw(); touch(); };
+  g('gravity').oninput=e=>{ SC.gravity=+e.target.value||0; touch(); };
+  g('bgColor').oninput=e=>{ SC.bg=e.target.value; draw(); touch(); }; g('tileColor').oninput=e=>{ SC.tileColor=e.target.value; draw(); touch(); };
+  g('gridChk').onchange=e=>{ showGrid=e.target.checked; draw(); }; g('snapChk').onchange=e=>{ snap=e.target.checked; };
+  g('zoomIn').onclick=()=>{ cam.z=Math.min(6,cam.z*1.2); draw(); }; g('zoomOut').onclick=()=>{ cam.z=Math.max(.2,cam.z/1.2); draw(); }; g('zoomReset').onclick=()=>{ cam={x:-60,y:-60,z:1}; draw(); };
+  window.addEventListener('resize',resize);
+  g('btnExportGame').onclick=()=>{ try{ const html=buildExportHTML(); const b=new Blob([html],{type:'text/html'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=(SC.name||'jogo')+'-jogo.html'; a.click(); logMsg('Jogo exportado como HTML jogável (abra o arquivo baixado).'); }catch(err){ logMsg('Erro ao exportar: '+err.message); } };
+  g('addLayer').onclick=()=>{ SC.layers.push({id:'L'+uid(),name:'Camada '+(SC.layers.length+1),visible:true}); SC.active=SC.layers[SC.layers.length-1].id; renderLayers(); touch(); };
+  g('btnArt').onclick=openArtEditor; g('artClose').onclick=closeArtEditor;
+  g('btnTut').onclick=()=>g('tutModal').classList.add('open'); g('tutClose').onclick=()=>g('tutModal').classList.remove('open');
+  g('artUse').onclick=()=>{ const f=g('artFrame'); if(f&&f.contentWindow)f.contentWindow.postMessage({type:'amz_getProject'},'*'); else logMsg('Editor de arte não está aberto.'); };
+  window.addEventListener('message',e=>{ const d=e.data; if(d&&d.type==='amz_project'){ const p=projFromAny(d.data); if(p){ importArt(p,(d.data&&d.data.name)||'arte'); closeArtEditor(); } else logMsg('Arte recebida vazia.'); } });
+  document.addEventListener('keydown',e=>{ if(RUN)return; if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return; if(e.key==='Delete'&&sel){ SC.entities=SC.entities.filter(z=>z!==sel); select(null); touch(); } });
+}
+function boot(){ wire(); initFB();
+  let loaded=false; try{ const r=localStorage.getItem('game_proj'); if(r){ loadScene(JSON.parse(r)); loaded=true; } }catch(e){}
+  if(!loaded){ syncSceneInputs(); renderAssets(); renderLayers(); }
+  resize(); logMsg('Bem-vindo ao Game Studio! 1) Importe suas artes  2) Pinte plataformas  3) Coloque objetos  4) Dê um comportamento de Player  5) ▶ Jogar.');
+}
+boot();
+</script>
+</body>
+</html>
