@@ -54,6 +54,34 @@
   .auth-logo{font-weight:800;color:var(--accent);text-align:center;font-size:1.25em;margin-bottom:4px}
   .modal{display:none;position:fixed;inset:0;z-index:15000;background:rgba(0,0,0,.62);align-items:center;justify-content:center}
   .modal.open{display:flex}
+  /* ==== UI polish ==== */
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:#24402f;border-radius:8px;border:2px solid transparent;background-clip:content-box}
+  ::-webkit-scrollbar-thumb:hover{background:#356048;background-clip:content-box}
+  *{scrollbar-width:thin;scrollbar-color:#24402f transparent}
+  button{transition:background .12s,border-color .12s,color .12s,transform .04s}
+  button:hover{background:#22382a}
+  button:active{transform:translateY(1px)}
+  button.on,button.primary{background:linear-gradient(#1f4a35,#173a29);border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 1px rgba(127,255,212,.15)}
+  button.danger:hover{background:#3a1f1f;border-color:var(--danger);color:var(--danger)}
+  #btnPlay{font-weight:600}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(127,255,212,.18)}
+  header{box-shadow:0 2px 12px #0007}
+  .side{gap:10px}
+  .card{border-radius:10px;box-shadow:0 1px 0 #0004}
+  .card>h3{cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;margin:0 0 8px}
+  .card>h3::after{content:"▾";color:var(--muted);font-size:9px;transition:transform .15s;opacity:.75}
+  .card.collapsed>h3{margin-bottom:0}
+  .card.collapsed>h3::after{transform:rotate(-90deg)}
+  .card.collapsed>*:not(h3){display:none}
+  .tools button{padding:8px 6px;border-radius:7px}
+  .tools button.on{font-weight:600}
+  .asset{transition:border-color .12s,background .12s}
+  .asset:hover{border-color:#3a5d44}
+  .asset.sel{box-shadow:0 0 0 1px rgba(127,255,212,.25)}
+  .vtools button{backdrop-filter:blur(4px)}
+  .modal .auth-card{box-shadow:0 20px 60px #000c;border-radius:14px}
 </style>
 </head>
 <body>
@@ -920,6 +948,7 @@ function wire(){ buildTools(); setTool('select');
     if(rz)rz.onpointerdown=e=>{ e.preventDefault(); e.stopPropagation(); dr={t:'size',sx:e.clientX,w0:g('pvCanvas').width}; window.addEventListener('pointermove',mv); window.addEventListener('pointerup',up); };
   })();
   window.addEventListener('resize',resize);
+  document.querySelectorAll('.side .card>h3').forEach(h=>{ h.title='clique para recolher/expandir'; h.onclick=()=>h.parentElement.classList.toggle('collapsed'); });
   g('btnExportGame').onclick=()=>{ try{ const html=buildExportHTML(); const b=new Blob([html],{type:'text/html'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=(SC.name||'jogo')+'-jogo.html'; a.click(); logMsg('Jogo exportado como HTML jogável (abra o arquivo baixado).'); }catch(err){ logMsg('Erro ao exportar: '+err.message); } };
   g('btnExportApp').onclick=()=>{ try{ buildAppZip(); }catch(err){ logMsg('Erro ao exportar app: '+err.message); } };
   g('addScene').onclick=()=>addScene();
