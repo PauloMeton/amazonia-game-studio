@@ -610,11 +610,31 @@ var p=this.player();
 if(p){ var dx=p.x-this.x, dy=p.y-this.y, d=Math.hypot(dx,dy)||1;
   this.vx=dx/d*90; this.vy=dy/d*90; this.move(); this.flip=this.vx<0; }`
 };
+function localGen(desc){ const t=(desc||'').toLowerCase(); const has=(...ks)=>ks.some(k=>t.indexOf(k)>=0);
+  if(has('pulo duplo','duplo')) return EXAMPLES['pulo-duplo'];
+  if(has('dash','investida','arranco','avanco','avanço')) return EXAMPLES['dash'];
+  if(has('mola','trampolim','quica')) return EXAMPLES['mola'];
+  if(has('esmaga','prensa','esmagador')) return EXAMPLES['esmagador'];
+  if(has('beira','nao cai','não cai','borda')) return EXAMPLES['patrulha-borda'];
+  if(has('vertical','sobe e desce','sobe desce')) return EXAMPLES['patrulha-vertical'];
+  if(has('patrulha','vai e volta','ronda','de um lado')) return EXAMPLES['plataforma-movel'];
+  if(has('flutu','levita')) return EXAMPLES['flutua'];
+  if(has('some','desaparec','sumir','tempo')) return EXAMPLES['some-tempo'];
+  if(has('coleta','moeda','coletav','pega item')) return EXAMPLES['coleta-pontos'];
+  if(has('olha','encara','vira para o player')) return EXAMPLES['olha-player'];
+  if(has('controle de plataforma','pulo variavel','pulo variável','controlar o player')) return EXAMPLES['plataforma-controle'];
+  if(has('persegu','perseguir','atras','atrás','segue','seguir','caca','caça','vai atras','vai atrás')){
+    if(has('pula','plataforma','obstacul','salta')) return EXAMPLES['persegue-pula'];
+    if(has('eixo x','horizontal')) return EXAMPLES['segue-x'];
+    return EXAMPLES['seguir-suave'];
+  }
+  return null; }
 const AICode={
   ex(v){ if(!v)return; const t=g('inScript'); if(t){ t.value=EXAMPLES[v]||''; } g('aiCodeMsg').textContent='Exemplo inserido. Clique em "Aplicar script".'; },
   gen(){ const p=(g('aiCodePrompt').value||'').trim(); if(!p){ g('aiCodeMsg').textContent='Descreva o que o objeto deve fazer.'; return; }
+    const _local=localGen(p); if(_local){ const t=g('inScript'); if(t)t.value=_local; g('aiCodeMsg').textContent='✅ Pronto! Usei um modelo testado para isso. Revise e clique em "Aplicar script".'; return; }
     g('aiCodeMsg').textContent='Gerando código com IA (precisa de internet)...';
-    const sys='Voce escreve APENAS o corpo de uma funcao update(dt) em JavaScript para um motor de jogo 2D. Use this para o objeto: propriedades this.x,this.y,this.vx,this.vy,this.w,this.h,this.onGround,this.flip,this.state (objeto livre p/ guardar dados),this.input (left,right,up,down,jump,action,key(code)),this.gravity,this.mode,this.tile. Metodos: this.move(), this.play("clip"), this.solidAt(x,y), this.find("nome"), this.player(), this.destroy(), this.log(msg). Em jogo de plataforma faca this.vy+=this.gravity*dt antes de this.move(). NAO use import, require, DOM, window, fetch, setTimeout nem markdown. Responda SOMENTE com codigo JavaScript puro. Tarefa: ';
+    const sys='Voce escreve APENAS o corpo de uma funcao update(dt) em JavaScript para um motor de jogo 2D. Use this para o objeto: propriedades this.x,this.y,this.vx,this.vy,this.w,this.h,this.onGround,this.flip,this.state (objeto livre p/ guardar dados),this.input (left,right,up,down,jump,action,key(code)),this.gravity,this.mode,this.tile. Metodos: this.move(), this.play("clip"), this.solidAt(x,y), this.find("nome"), this.player(), this.destroy(), this.log(msg). REGRAS: o codigo deve ser COMPLETO e funcional; sempre que mover o objeto chame this.move(); em jogo de plataforma faca this.vy+=this.gravity*dt antes de this.move(); para o jogador use this.player() (NAO use this.find); guarde dados em this.state; NAO use import, require, DOM, window, fetch, setTimeout nem markdown nem comentarios longos. Responda SOMENTE com o codigo JavaScript puro. Tarefa: ';
     const _ctl=('AbortController' in window)?new AbortController():null; const _to=setTimeout(()=>{ if(_ctl)_ctl.abort(); },22000);
     fetch('https://text.pollinations.ai/'+encodeURIComponent(sys+p), _ctl?{signal:_ctl.signal}:{}).then(r=>r.text()).then(txt=>{ clearTimeout(_to); let code=(txt||'').trim(); code=code.replace(/^```[a-zA-Z]*\s*/,'').replace(/```\s*$/,'').trim();
       if(!code){ g('aiCodeMsg').textContent='IA não retornou código. Tente reescrever ou use exemplos.'; return; }
