@@ -141,6 +141,17 @@
   </div>
 </div>
 
+<div id="asstModal" class="modal">
+  <div class="auth-card" style="width:580px;max-width:95%">
+    <div class="row" style="justify-content:space-between"><div class="auth-logo" style="margin:0;font-size:1.1em">🤖 Assistente</div><button id="asstClose">fechar</button></div>
+    <p class="note">Diga o que fazer no projeto e eu altero pra você — funciona offline (não depende de IA externa).</p>
+    <p class="note" style="color:var(--muted)">🔒 Acesso restrito: só altera <b>o seu projeto</b> (cena, objetos, comportamentos). Não mexe em conta/login, nuvem, deploy nem outros projetos.</p>
+    <div class="row"><input id="asstIn" placeholder="ex: criar chão e adicionar 3 moedas"><button class="primary" id="asstRun" style="white-space:nowrap">Executar</button></div>
+    <p class="note" id="asstOut" style="margin-top:4px;color:var(--accent)"></p>
+    <p class="note" style="margin-top:6px">Exemplos: <b>criar chão</b> • <b>criar plataformas</b> • <b>paredes da sala</b> • <b>modo top-down</b> • <b>gravidade 1500</b> • <b>zoom 2</b> • <b>alvo celular paisagem</b> • <b>adicionar 3 moedas</b> • <b>tornar selecionado player</b> • <b>fazer o selecionado perseguir o player</b> • <b>patrulha no selecionado</b> • <b>pulo duplo no selecionado</b> • <b>nova cena</b> • <b>apagar selecionado</b>.</p>
+  </div>
+</div>
+
 <div id="courseModal" class="modal">
   <div class="auth-card" style="width:720px;max-width:96%;max-height:92%;overflow:auto;gap:6px">
     <div class="row" style="justify-content:space-between"><div class="auth-logo" style="margin:0;font-size:1.1em">Aula: criar um jogo simples</div><button id="courseClose">fechar</button></div>
@@ -212,6 +223,7 @@
     <span class="note" id="saveDot">salvo</span>
     <button class="primary" id="btnPlay">▶ Jogar</button>
     <button id="btnStop" class="hide">■ Parar</button>
+    <button id="btnAssist">🤖 Assistente</button>
     <button id="btnCourse">📚 Aula</button>
     <button id="btnTut">❓ Tutorial</button>
     <div class="spacer"></div>
@@ -955,6 +967,51 @@ function exampleProject(kind){ const hero=makeHero(), coin=makeCoin();
   return {v:2,name:(kind==='platformer'?'modelo-plataforma':'modelo-topdown'),cur:0,target:'desktop',touchctl:'auto',camZoom:1,assets:assets,scenes:[scene]}; }
 function loadCourse(kind){ if(!confirm('Carregar o projeto-modelo? O projeto atual fica salvo localmente até você salvar de novo.')) return; loadProject(exampleProject(kind)); g('courseModal').classList.remove('open'); touch(); logMsg('📚 Projeto-modelo "'+kind+'" carregado! Clique em ▶ Jogar para testar. Estude os Comportamentos de cada objeto no Inspetor.'); }
 
+/* ============ ASSISTENTE (comandos no projeto) ============ */
+function refreshAll(){ syncSceneInputs(); renderAssets(); renderLayers(); renderScenes(); refreshInspector(); draw(); touch(); }
+function asstLog(m){ const el=g('asstOut'); if(el)el.textContent=m; logMsg('🤖 '+m); }
+function runAssistant(raw){ const t=(raw||'').toLowerCase().trim(); if(!t){ asstLog('Escreva um comando.'); return; }
+  const said=[]; const want=(...ks)=>ks.some(k=>t.indexOf(k)>=0);
+  const numAfter=(kw,def)=>{ const m=t.match(new RegExp(kw+"\\s*(?:para|pra|=|:|de)?\\s*(-?[0-9]+(?:\\.[0-9]+)?)")); return m?parseFloat(m[1]):def; };
+  const selObj=sel;
+  // --- cena/projeto ---
+  if(want('top-down','top down','topdown','de cima','visto de cima')){ SC.mode='topdown'; SC.gravity=0; said.push('tipo: top-down'); }
+  else if(want('modo plataforma','jogo de plataforma','tipo plataforma','vira plataforma','virar plataforma')){ SC.mode='platformer'; if(!SC.gravity)SC.gravity=1800; said.push('tipo: plataforma'); }
+  if(want('gravidade')){ SC.gravity=numAfter('gravidade',SC.gravity); said.push('gravidade '+SC.gravity); }
+  if(want('zoom')){ PR.camZoom=Math.max(.3,Math.min(4,numAfter('zoom',PR.camZoom))); said.push('zoom '+PR.camZoom.toFixed(1)); }
+  if(want('retrato')){ PR.target='portrait'; said.push('alvo: celular retrato'); }
+  else if(want('paisagem')){ PR.target='landscape'; said.push('alvo: celular paisagem'); }
+  else if(want('desktop','computador')){ PR.target='desktop'; said.push('alvo: computador'); }
+  // --- tiles ---
+  if(want('limpar','apagar tiles','apagar o chão','apagar chao','limpar cenário','limpar cenario','apagar tudo')){ SC.grid={}; said.push('tiles apagados'); }
+  if(want('chão','chao','piso')){ for(let x=-4;x<60;x++)SC.grid[x+',14']=1; said.push('chão criado'); }
+  if(want('paredes','sala fechada','bordas')){ for(let x=2;x<=23;x++){SC.grid[x+',2']=1;SC.grid[x+',15']=1;} for(let y=2;y<=15;y++){SC.grid['2,'+y]=1;SC.grid['23,'+y]=1;} said.push('paredes da sala criadas'); }
+  if(want('plataformas')||(want('plataforma')&&want('criar','adicionar','fazer','algumas','umas','gerar','umas'))){ [[6,11,3],[11,9,3],[16,7,3],[21,10,4]].forEach(p=>{ for(let i=0;i<p[2];i++)SC.grid[(p[0]+i)+','+p[1]]=1; }); said.push('plataformas criadas'); }
+  // --- nova cena ---
+  if(want('nova cena','criar cena','adicionar cena','outra cena')){ addScene(); asstLog('Feito: nova cena criada.'); return; }
+  // --- colocar objetos ---
+  if(want('adicion','coloc','põe','poe','criar objeto','crie')&&want('moeda','inimigo','objeto','herói','heroi','player','jogador','personagem')){
+    if(!PR.assets.length){ said.push('(sem artes na biblioteca — importe no Editor de Arte)'); }
+    else { const count=Math.max(1,Math.min(20,(t.match(/(\d+)/)?parseInt(t.match(/(\d+)/)[1]):1)));
+      const a=(want('moeda')?PR.assets.find(x=>x.name.toLowerCase().indexOf('moeda')>=0):null)||PR.assets[0]; const T=SC.tile; let last=null;
+      for(let i=0;i<count;i++){ last=addEntity(a.id,(4+i*3)*T,6*T); if(want('moeda'))last.behaviors.push({type:'collectible',params:{value:1}}); else if(want('inimigo'))last.behaviors.push({type:(SC.mode==='topdown'?'follow':'follow'),params:Object.assign({},BEH_DEF['follow'].params)}); }
+      if(want('player','jogador','herói','heroi')&&last){ last.behaviors=[{type:SC.mode==='topdown'?'player-topdown':'player-platformer',params:Object.assign({},BEH_DEF[SC.mode==='topdown'?'player-topdown':'player-platformer'].params)}]; }
+      if(last)select(last); said.push(count+' "'+a.name+'" colocado(s)'); }
+  }
+  // --- ações no objeto selecionado ---
+  if(want('tornar','virar','vira','seja','transformar','dar comportamento','fazer')&&want('player','jogador','control')&&selObj){
+    selObj.behaviors=selObj.behaviors.filter(b=>b.type!=='player-platformer'&&b.type!=='player-topdown');
+    selObj.behaviors.push({type:SC.mode==='topdown'?'player-topdown':'player-platformer',params:Object.assign({},BEH_DEF[SC.mode==='topdown'?'player-topdown':'player-platformer'].params)}); said.push('"'+selObj.name+'" agora é Player'); }
+  if(want('persegu','atrás','atras','seguir','vai atras','vai atrás','caçar','cacar')&&selObj){ selObj.script=EXAMPLES[(want('pula','plataforma','obstacul')?'persegue-pula':'seguir-suave')]; said.push('"'+selObj.name+'" persegue o player'); }
+  else if(want('patrulha','vai e volta')&&selObj){ selObj.behaviors.push({type:'patrol',params:Object.assign({},BEH_DEF['patrol'].params)}); said.push('patrulha em "'+selObj.name+'"'); }
+  else if(want('pulo duplo','duplo')&&selObj){ selObj.script=EXAMPLES['pulo-duplo']; said.push('pulo duplo em "'+selObj.name+'"'); }
+  if(want('coletável','coletavel','vira moeda','pode coletar')&&selObj){ selObj.behaviors.push({type:'collectible',params:{value:1}}); said.push('"'+selObj.name+'" agora é coletável'); }
+  if(want('anima')&&selObj){ const a=assetById(selObj.asset); const c=a?a.clipNames:[]; const par=c[0]||'idle', an=c[1]||c[0]||'idle'; selObj.behaviors.push({type:'animator',params:{parado:par,andando:an,pulando:par,caindo:par}}); said.push('animações por estado em "'+selObj.name+'"'); }
+  if(want('apagar','remover','deletar','excluir')&&want('selecionado','objeto','esse','este','ele')&&selObj){ SC.entities=SC.entities.filter(z=>z!==selObj); select(null); said.push('objeto apagado'); }
+  if(want('escala')&&selObj){ const v=Math.max(.25,numAfter('escala',SXof(selObj))); selObj.sx=v; selObj.sy=v; delete selObj.scale; said.push('escala '+v); }
+  if(!said.length){ asstLog('Não entendi. Tente: "criar chão", "adicionar 3 moedas", "tornar selecionado player", "fazer o selecionado perseguir o player", "modo top-down", "gravidade 1500", "nova cena".'); return; }
+  refreshAll(); asstLog('Feito: '+said.join('; ')+'.'); }
+
 /* ============ EDITOR DE ARTE (módulo) ============ */
 function openArtEditor(){ const f=g('artFrame'); if(!f.getAttribute('src')) f.setAttribute('src','amazonia-pixel-studio.html'); g('artEditor').style.display='flex'; }
 function closeArtEditor(){ g('artEditor').style.display='none'; }
@@ -1089,6 +1146,8 @@ function wire(){ buildTools(); setTool('select');
   g('btnArt').onclick=openArtEditor; g('artClose').onclick=closeArtEditor;
   g('btnTut').onclick=()=>g('tutModal').classList.add('open'); g('tutClose').onclick=()=>g('tutModal').classList.remove('open');
   g('btnCourse').onclick=()=>g('courseModal').classList.add('open'); g('courseClose').onclick=()=>g('courseModal').classList.remove('open');
+  g('btnAssist').onclick=()=>{ g('asstModal').classList.add('open'); setTimeout(()=>{const i=g('asstIn');if(i)i.focus();},50); }; g('asstClose').onclick=()=>g('asstModal').classList.remove('open');
+  g('asstRun').onclick=()=>runAssistant(g('asstIn').value); g('asstIn').addEventListener('keydown',e=>{ if(e.key==='Enter')runAssistant(g('asstIn').value); });
   g('loadCoursePlat').onclick=()=>loadCourse('platformer'); g('loadCourseTop').onclick=()=>loadCourse('topdown');
   g('flowClose').onclick=()=>Flow.close(); g('flowAddNode').onchange=e=>{ if(e.target.value&&Flow.p){ Flow.p.nodes.push({id:'n'+uid(),clip:e.target.value,x:40,y:40}); if(!Flow.p.start)Flow.p.start=Flow.p.nodes[Flow.p.nodes.length-1].id; e.target.value=''; Flow.render(); touch(); } };
   g('artUse').onclick=()=>{ const f=g('artFrame'); if(f&&f.contentWindow)f.contentWindow.postMessage({type:'amz_getProject'},'*'); else logMsg('Editor de arte não está aberto.'); };
