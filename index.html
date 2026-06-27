@@ -272,6 +272,7 @@ function respawn(e){ e.x=e.startX; e.y=e.startY; e.vx=0; e.vy=0; }
 const KEY_OPTS=[['KeyJ','J'],['KeyK','K'],['KeyL','L'],['KeyZ','Z'],['KeyX','X'],['KeyC','C'],['KeyE','E'],['KeyQ','Q'],['KeyF','F'],['KeyR','R'],['Space','Espaço'],['ShiftLeft','Shift'],['Enter','Enter'],['ArrowUp','Seta ↑'],['ArrowDown','Seta ↓'],['ArrowLeft','Seta ←'],['ArrowRight','Seta →'],['Digit1','1'],['Digit2','2'],['Digit3','3'],['Digit4','4']];
 const BEH_DEF={
   'keys':{label:'Tecla → Animação',params:{rules:[]}},
+  'animator':{label:'Animações por estado',params:{parado:'',andando:'',pulando:'',caindo:''}},
   'player-platformer':{label:'Player Plataforma',params:{speed:200,jump:560}},
   'player-topdown':{label:'Player Top-down',params:{speed:160}},
   'patrol':{label:'Patrulha (horizontal)',params:{speed:60,dist:96}},
@@ -281,22 +282,27 @@ const BEH_DEF={
 };
 const BEH={
   'player-platformer':(e,p,dt)=>{ const sp=+p.speed||200, jp=+p.jump||560; e.vx=(Input.right?sp:0)-(Input.left?sp:0); e.vy+=SC.gravity*dt; if(Input.jump&&e.onGround)e.vy=-jp; moveE(e,dt);
-    if(e.vx<0)e.flip=true; else if(e.vx>0)e.flip=false; autoClip(e, !e.onGround?['pular','jump','idle']:(e.vx!==0?['correr','andar','andar-dir','walk']:['idle','parado'])); if(e.y>6000)respawn(e); },
+    if(e.vx<0)e.flip=true; else if(e.vx>0)e.flip=false; if(!hasAnimator(e))autoClip(e, !e.onGround?['pular','jump','idle']:(e.vx!==0?['correr','andar','andar-dir','walk']:['idle','parado'])); if(e.y>6000)respawn(e); },
   'player-topdown':(e,p,dt)=>{ const sp=+p.speed||160; let dx=(Input.right?1:0)-(Input.left?1:0), dy=(Input.down?1:0)-(Input.up?1:0); if(dx&&dy){dx*=Math.SQRT1_2;dy*=Math.SQRT1_2;} e.vx=dx*sp; e.vy=dy*sp; moveE(e,dt);
-    let c; if(dy>0)c=['andar-baixo','andar','walk']; else if(dy<0)c=['andar-cima','andar','walk']; else if(dx>0){c=['andar-dir','andar','walk'];e.flip=false;} else if(dx<0){ if(hasClip(e,'andar-esq')){c=['andar-esq'];e.flip=false;}else{c=['andar-dir','andar','walk'];e.flip=true;} } else c=['idle','parado']; autoClip(e,c); },
+    let c; if(dy>0)c=['andar-baixo','andar','walk']; else if(dy<0)c=['andar-cima','andar','walk']; else if(dx>0){c=['andar-dir','andar','walk'];e.flip=false;} else if(dx<0){ if(hasClip(e,'andar-esq')){c=['andar-esq'];e.flip=false;}else{c=['andar-dir','andar','walk'];e.flip=true;} } else c=['idle','parado']; if(!hasAnimator(e))autoClip(e,c); },
   'patrol':(e,p,dt)=>{ const sp=+p.speed||60, dist=+p.dist||96; if(e.state._o===undefined){e.state._o=e.x;e.state._d=1;} e.vx=sp*e.state._d; if(SC.mode==='platformer')e.vy+=SC.gravity*dt; moveE(e,dt);
-    if(Math.abs(e.x-e.state._o)>=dist||e.vx===0){ e.state._d*=-1; e.state._o=e.x; } e.flip=e.state._d<0; autoClip(e,['andar','andar-dir','walk','idle']); },
+    if(Math.abs(e.x-e.state._o)>=dist||e.vx===0){ e.state._d*=-1; e.state._o=e.x; } e.flip=e.state._d<0; if(!hasAnimator(e))autoClip(e,['andar','andar-dir','walk','idle']); },
   'follow':(e,p,dt)=>{ const sp=+p.speed||90, rng=+p.range||320; const pl=RUN.player; if(pl){ const ddx=pl.x-e.x, ddy=pl.y-e.y, d=Math.hypot(ddx,ddy);
       if(d<rng&&d>1){ if(SC.mode==='topdown'){e.vx=ddx/d*sp;e.vy=ddy/d*sp;} else {e.vx=Math.sign(ddx)*sp;e.vy+=SC.gravity*dt;} } else { e.vx=0; if(SC.mode==='platformer')e.vy+=SC.gravity*dt; } }
-    moveE(e,dt); if(e.vx)e.flip=e.vx<0; autoClip(e,['andar','correr','andar-dir','walk','idle']); },
+    moveE(e,dt); if(e.vx)e.flip=e.vx<0; if(!hasAnimator(e))autoClip(e,['andar','correr','andar-dir','walk','idle']); },
   'collectible':(e,p,dt)=>{ const pl=RUN.player; if(pl&&overlap(e,pl)){ e.dead=true; RUN.score=(RUN.score||0)+(+p.value||1); logMsg('Coletado! Pontos: '+RUN.score); } },
   'hazard':(e,p,dt)=>{ const pl=RUN.player; if(pl&&overlap(e,pl)){ respawn(pl); logMsg('Encostou no perigo — voltou ao início.'); } },
   'keys':(e,p,dt)=>{ const rules=p.rules||[]; if(!e.state._kp)e.state._kp={};
     rules.forEach((r,i)=>{ if(!r.key)return; const down=Input.key(r.key); const was=e.state._kp[i]; e.state._kp[i]=down; const jp=down&&!was;
       if(r.clip){ if(r.mode==='hold'){ if(down) setLockClip(e,r.clip,0.07); } else if(jp){ setLockClip(e,r.clip,clipDur(e,r.clip)); } }
       if(jp&&r.act==='jump'&&e.onGround) e.vy=-560;
-    }); }
+    }); },
+  'animator':(e,p,dt)=>{ if(e._lockUntil&&RUN.t<e._lockUntil)return; let t=p.parado; const mv=Math.abs(e.vx)>1;
+    if(SC.mode==='platformer'){ if(!e.onGround){ t=(e.vy<0?(p.pulando||p.caindo):(p.caindo||p.pulando))||p.andando||p.parado; } else if(mv){ t=p.andando||p.parado; } else { t=p.parado; } }
+    else { t=(mv||Math.abs(e.vy)>1)?(p.andando||p.parado):p.parado; }
+    if(t&&hasClip(e,t)&&e.clip!==t){ e.clip=t; e._t=0; } }
 };
+function hasAnimator(e){ return e.behaviors&&e.behaviors.some(b=>b.type==='animator'); }
 function clipDur(e,c){ const a=assetById(e.asset); const fs=a&&a.clips[c]; return fs?Math.max(0.15,fs.length/(e.fps||10)):0.3; }
 function setLockClip(e,c,dur){ e._lockUntil=RUN.t+dur; if(e.clip!==c){e.clip=c;e._t=0;} }
 /* ============ IA / EXEMPLOS DE CÓDIGO ============ */
@@ -471,6 +477,9 @@ function renderBehs(){ const w=g('behs'); if(!w)return; w.innerHTML=''; const a=
         ph+='<div><label>Ação</label><select class="ra" data-i="'+i+'" data-j="'+j+'"><option value=""'+(!r.act?' selected':'')+'>nenhuma</option><option value="jump"'+(r.act==='jump'?' selected':'')+'>pular</option></select></div></div>';
         ph+='<button class="rmRule" data-i="'+i+'" data-j="'+j+'" style="margin-top:4px;padding:2px 8px">remover regra</button></div>'; });
       ph+='<button class="addRule" data-i="'+i+'" style="width:100%">+ regra (tecla → animação)</button>';
+    } else if(b.type==='animator'){ const states=[['parado','Parado (idle)'],['andando','Andando'],['pulando','Pulando'],['caindo','Caindo']];
+      ph+='<p class="note">Escolha qual animação toca em cada situação:</p>';
+      ph+=states.map(st=>'<label style="margin-top:4px">'+st[1]+'</label><select class="anS" data-i="'+i+'" data-k="'+st[0]+'"><option value="">— (não mudar)</option>'+clipOpts.map(c=>'<option'+(b.params[st[0]]===c?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select>').join('');
     } else { const keys=Object.keys(b.params||{}).filter(k=>typeof b.params[k]==='number'); if(keys.length){ ph+='<div class="grid2">'+keys.map(k=>'<div><label>'+k+'</label><input type="number" class="behP" data-i="'+i+'" data-k="'+k+'" value="'+b.params[k]+'"></div>').join('')+'</div>'; } }
     d.innerHTML=ph; w.appendChild(d); });
   w.querySelectorAll('.rmBeh').forEach(btn=>btn.onclick=()=>{ sel.behaviors.splice(+btn.dataset.i,1); refreshInspector(); touch(); });
@@ -478,7 +487,8 @@ function renderBehs(){ const w=g('behs'); if(!w)return; w.innerHTML=''; const a=
   w.querySelectorAll('.addRule').forEach(btn=>btn.onclick=()=>{ sel.behaviors[+btn.dataset.i].params.rules.push({key:'KeyJ',clip:'',mode:'once',act:''}); refreshInspector(); touch(); });
   w.querySelectorAll('.rmRule').forEach(btn=>btn.onclick=()=>{ sel.behaviors[+btn.dataset.i].params.rules.splice(+btn.dataset.j,1); refreshInspector(); touch(); });
   const bindR=(cls,f)=>w.querySelectorAll(cls).forEach(s=>s.onchange=()=>{ sel.behaviors[+s.dataset.i].params.rules[+s.dataset.j][f]=s.value; touch(); });
-  bindR('.rk','key'); bindR('.rc','clip'); bindR('.rm','mode'); bindR('.ra','act'); }
+  bindR('.rk','key'); bindR('.rc','clip'); bindR('.rm','mode'); bindR('.ra','act');
+  w.querySelectorAll('.anS').forEach(s=>s.onchange=()=>{ sel.behaviors[+s.dataset.i].params[s.dataset.k]=s.value; touch(); }); }
 
 /* ============ SALVAR / CARREGAR ============ */
 function stripEnt(e){ return {id:e.id,name:e.name,x:e.x,y:e.y,asset:e.asset,clip:e.clip,scale:e.scale,fps:e.fps,flip:e.flip,layer:e.layer,behaviors:e.behaviors,script:e.script}; }
