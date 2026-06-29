@@ -155,6 +155,7 @@
       <button class="genPre" data-d="plataforma de coleta de moedas no gelo">🪙 Coletar moedas</button>
       <button class="genPre" data-d="top-down sobrevivência com muitos inimigos na caverna">👾 Sobrevivência</button>
       <button class="genPre" data-d="plataforma com espinhos perigo e moedas no deserto">⚠ Obstáculos</button>
+      <button class="genPre" data-d="soul knight com aliados e inimigos atiradores na masmorra">🤝 Com aliados</button>
     </div>
     <p class="note" style="margin-top:6px">Entende: <b>plataforma</b> ou <b>top-down</b> (masmorra/labirinto); temas (floresta, caverna, gelo, deserto, lava, espaço, cidade); <b>inimigos</b>, <b>moedas</b>, <b>espinhos</b>. Clique de novo para variações.</p>
   </div>
@@ -517,7 +518,12 @@ const BEH_DEF={
   'collectible':{label:'Coletável',params:{value:1}},
   'hazard':{label:'Perigo (machuca)',params:{}},
   'inimigo':{label:'Inimigo (vida + machuca)',params:{vida:3}},
-  'atirador':{label:'Atirador (J mira o inimigo)',params:{velocidade:340,cadencia:0.3,alcance:420}}
+  'atirador':{label:'Atirador (J mira o inimigo)',params:{velocidade:340,cadencia:0.3,alcance:420}},
+  'inimigo-persegue':{label:'Inimigo: perseguidor',params:{vida:3,velocidade:90}},
+  'inimigo-patrulha':{label:'Inimigo: patrulha',params:{vida:3,velocidade:60,distancia:96}},
+  'inimigo-atira':{label:'Inimigo: atirador',params:{vida:3,velocidade:40,alcance:300,cadencia:1.1,velocidadeBala:260}},
+  'aliado-segue':{label:'Aliado: segue você',params:{velocidade:140}},
+  'aliado-atira':{label:'Aliado: atira nos inimigos',params:{velocidade:130,alcance:420,cadencia:0.5,velocidadeBala:320}}
 };
 const BEH={
   'player-platformer':(e,p,dt)=>{ const sp=+p.speed||200, jp=+p.jump||560; e.vx=(Input.right?sp:0)-(Input.left?sp:0); e.vy+=SC.gravity*dt; if(Input.jump&&e.onGround){e.vy=-jp; playSnd('pulo');} moveE(e,dt);
@@ -532,7 +538,14 @@ const BEH={
   'collectible':(e,p,dt)=>{ const pl=RUN.player; if(pl&&overlap(e,pl)){ e.dead=true; RUN.score=(RUN.score||0)+(+p.value||1); playSnd('moeda'); logMsg('Coletado! Pontos: '+RUN.score); } },
   'hazard':(e,p,dt)=>{ const pl=RUN.player; if(pl&&overlap(e,pl)){ respawn(pl); playSnd('dano'); logMsg('Encostou no perigo — voltou ao início.'); } },
   'inimigo':(e,p,dt)=>{ if(e.hp===undefined)e.hp=+p.vida||3; e.isEnemy=true; const pl=RUN.player; if(pl&&overlap(e,pl)){ respawn(pl); playSnd('dano'); } if(e.hp<=0){ e.dead=true; RUN.score=(RUN.score||0)+1; playSnd('moeda'); } },
-  'projetil':(e,p,dt)=>{ if((RUN.t-(e._born||0))>(e.life||2)){ e.dead=true; return; } e.x+=e.vx*dt; e.y+=e.vy*dt; if(solid(Math.floor((e.x+e.w/2)/SC.tile),Math.floor((e.y+e.h/2)/SC.tile))){ e.dead=true; return; } for(const z of RUN.ents){ if(z!==e&&z.isEnemy&&!z.dead&&overlap(e,z)){ z.hp-=(+p.dano||1); e.dead=true; break; } } },
+  'projetil':(e,p,dt)=>{ if((RUN.t-(e._born||0))>(e.life||2)){ e.dead=true; return; } e.x+=e.vx*dt; e.y+=e.vy*dt; if(solid(Math.floor((e.x+e.w/2)/SC.tile),Math.floor((e.y+e.h/2)/SC.tile))){ e.dead=true; return; } const team=p.team||'good';
+    if(team==='good'){ for(const z of RUN.ents){ if(z!==e&&z.isEnemy&&!z.dead&&overlap(e,z)){ z.hp-=(+p.dano||1); e.dead=true; break; } } }
+    else { const pl=RUN.player; if(pl&&overlap(e,pl)){ respawn(pl); playSnd('dano'); e.dead=true; } } },
+  'inimigo-persegue':(e,p,dt)=>{ if(!_enemyTick(e,p))return; const pl=RUN.player, sp=+p.velocidade||90; if(pl){ const ddx=pl.x-e.x, ddy=pl.y-e.y; if(SC.mode==='topdown'){ const d=Math.hypot(ddx,ddy)||1; e.vx=ddx/d*sp; e.vy=ddy/d*sp; } else { e.vx=Math.sign(ddx)*sp; e.vy+=SC.gravity*dt; if(e.onGround&&solid(Math.floor((e.x+(e.vx>0?e.w+2:-2))/SC.tile),Math.floor((e.y+e.h-2)/SC.tile)))e.vy=-460; } } moveE(e,dt); if(e.vx)e.flip=e.vx<0; autoClip(e,(Math.abs(e.vx)>1?['andar','correr','walk']:['idle','parado'])); },
+  'inimigo-patrulha':(e,p,dt)=>{ if(!_enemyTick(e,p))return; const sp=+p.velocidade||60, dist=+p.distancia||96; if(e.state._o===undefined){e.state._o=e.x;e.state._d=1;} e.vx=sp*e.state._d; if(SC.mode==='platformer')e.vy+=SC.gravity*dt; moveE(e,dt); if(Math.abs(e.x-e.state._o)>=dist||e.vx===0){e.state._d*=-1;e.state._o=e.x;} e.flip=e.state._d<0; autoClip(e,['andar','correr','walk','idle']); },
+  'inimigo-atira':(e,p,dt)=>{ if(!_enemyTick(e,p))return; const pl=RUN.player, sp=+p.velocidade||40, rng=+p.alcance||300; if(pl){ const ddx=pl.x-e.x, ddy=pl.y-e.y, d=Math.hypot(ddx,ddy)||1; if(d>rng){ if(SC.mode==='topdown'){e.vx=ddx/d*sp;e.vy=ddy/d*sp;} else {e.vx=Math.sign(ddx)*sp;e.vy+=SC.gravity*dt;} } else { e.vx=0; if(SC.mode!=='topdown')e.vy+=SC.gravity*dt; } moveE(e,dt); if(e.vx)e.flip=e.vx<0; e.state._cd=(e.state._cd||0)-dt; let sh=false; if(d<rng+60&&e.state._cd<=0){ _shootAt(e,pl.x+pl.w/2,pl.y+pl.h/2,+p.velocidadeBala||260,'bad'); e.state._cd=+p.cadencia||1.1; sh=true; } autoClip(e, sh?['atira','ataque','atirar','idle']:(Math.abs(e.vx)>1?['andar','walk','idle']:['idle','parado'])); } },
+  'aliado-segue':(e,p,dt)=>{ e.isAlly=true; const pl=RUN.player, sp=+p.velocidade||140; if(pl){ const ddx=pl.x-e.x, ddy=pl.y-e.y, d=Math.hypot(ddx,ddy)||1; if(d>60){ if(SC.mode==='topdown'){e.vx=ddx/d*sp;e.vy=ddy/d*sp;} else {e.vx=Math.sign(ddx)*sp;e.vy+=SC.gravity*dt;} } else { e.vx=0; if(SC.mode!=='topdown')e.vy+=SC.gravity*dt; } moveE(e,dt); if(e.vx)e.flip=e.vx<0; } autoClip(e,(Math.abs(e.vx)>1?['andar','walk','correr']:['idle','parado'])); },
+  'aliado-atira':(e,p,dt)=>{ e.isAlly=true; const pl=RUN.player, sp=+p.velocidade||130; if(pl){ const ddx=pl.x-e.x, ddy=pl.y-e.y, d=Math.hypot(ddx,ddy)||1; if(d>90){ if(SC.mode==='topdown'){e.vx=ddx/d*sp;e.vy=ddy/d*sp;} else {e.vx=Math.sign(ddx)*sp;e.vy+=SC.gravity*dt;} } else { e.vx=0; if(SC.mode!=='topdown')e.vy+=SC.gravity*dt; } moveE(e,dt); } e.state._cd=(e.state._cd||0)-dt; let sh=false; const en=_nearest(e.x+e.w/2,e.y+e.h/2,z=>z.isEnemy); if(en){ const d2=Math.hypot((en.x+en.w/2)-(e.x+e.w/2),(en.y+en.h/2)-(e.y+e.h/2)); if(d2<(+p.alcance||420)&&e.state._cd<=0){ _shootAt(e,en.x+en.w/2,en.y+en.h/2,+p.velocidadeBala||320,'good'); e.state._cd=+p.cadencia||0.5; sh=true; } } if(e.vx)e.flip=e.vx<0; autoClip(e, sh?['atira','ataque','idle']:(Math.abs(e.vx)>1?['andar','walk']:['idle','parado'])); },
   'atirador':(e,p,dt)=>{ e.state._cd=(e.state._cd||0)-dt; if(e.state._cd>0)return; if(!Input.action)return; const rng=+p.alcance||400; const cx=e.x+e.w/2, cy=e.y+e.h/2; let tx=null,ty=null,bd=rng; for(const z of RUN.ents){ if(z.isEnemy&&!z.dead){ const dd=Math.hypot((z.x+z.w/2)-cx,(z.y+z.h/2)-cy); if(dd<bd){bd=dd;tx=z.x+z.w/2;ty=z.y+z.h/2;} } } let dx,dy; if(tx!=null){ const d=Math.hypot(tx-cx,ty-cy)||1; dx=(tx-cx)/d; dy=(ty-cy)/d; } else { dx=e.flip?-1:1; dy=0; } const v=+p.velocidade||320; const ba=assetById('bala'); const bw=ba?ba.bbox.w*2:8, bh=ba?ba.bbox.h*2:8; spawnRT({asset:'bala',x:cx-bw/2,y:cy-bh/2,vx:dx*v,vy:dy*v,life:2,behaviors:[{type:'projetil',params:{dano:1}}]}); e.state._cd=+p.cadencia||0.35; playSnd('tiro'); },
   'keys':(e,p,dt)=>{ const rules=p.rules||[]; if(!e.state._kp)e.state._kp={}; if(!e.state._end)e.state._end={}; let active=null;
     rules.forEach((r,i)=>{ if(!r.key)return; const down=Input.key(r.key); const was=e.state._kp[i]; e.state._kp[i]=down; const jp=down&&!was;
@@ -569,6 +582,7 @@ function clipDur(e,c){ const a=assetById(e.asset); const fs=a&&a.clips[c]; retur
 function clipDurAsset(assetId,clip,fps){ const a=assetById(assetId); const fs=a&&a.clips[clip]; return fs?Math.max(0.15,fs.length/(fps||10)):0.3; }
 function setLockClip(e,c,dur){ e._lockUntil=RUN.t+dur; if(e.clip!==c){e.clip=c;e._t=0;} }
 /* ============ IA / EXEMPLOS DE CÓDIGO ============ */
+const ROLE_CLIPS={'player-platformer':['idle','andar','pular'],'player-topdown':['idle','andar'],'atirador':['idle','atira'],'inimigo-persegue':['idle','andar'],'inimigo-patrulha':['idle','andar'],'inimigo-atira':['idle','atira'],'aliado-segue':['idle','andar'],'aliado-atira':['idle','andar','atira']};
 const EX_LABELS={'plataforma-movel':'Plataforma móvel (vai e volta)','segue-x':'Segue o player (eixo X)','olha-player':'Olha para o player (flip)','pulo-duplo':'Pulo duplo','flutua':'Flutua no lugar','persegue-pula':'Persegue e pula obstáculos','coleta-pontos':'Some ao encostar no player','patrulha-vertical':'Patrulha vertical','dash':'Dash (tecla X)','mola':'Mola (joga p/ cima)','esmagador':'Esmagador (sobe/desce)','plataforma-controle':'Controle plataforma (pulo variável)','patrulha-borda':'Inimigo anda e vira na beira','some-tempo':'Some depois de 5s','seguir-suave':'Persegue suave (top-down)'};
 const EXAMPLES={
 'plataforma-movel':`// Plataforma que vai e volta na horizontal
@@ -809,7 +823,8 @@ function renderBehs(){ const w=g('behs'); if(!w)return; w.innerHTML=''; const a=
       ph+='<p class="note">Escolha qual animação toca em cada situação:</p>';
       ph+=states.map(st=>'<label style="margin-top:4px">'+st[1]+'</label><select class="anS" data-i="'+i+'" data-k="'+st[0]+'"><option value="">— (não mudar)</option>'+clipOpts.map(c=>'<option'+(b.params[st[0]]===c?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select>').join('');
     } else if(b.type==='flow'){ ph+='<p class="note">Monte arrastando os nós e ligando-os.</p><button class="flowBtn" data-i="'+i+'" style="width:100%">✎ Editar fluxo de animações</button>';
-    } else { const keys=Object.keys(b.params||{}).filter(k=>typeof b.params[k]==='number'); if(keys.length){ ph+='<div class="grid2">'+keys.map(k=>'<div><label>'+k+'</label><input type="number" class="behP" data-i="'+i+'" data-k="'+k+'" value="'+b.params[k]+'"></div>').join('')+'</div>'; } }
+    } else { const keys=Object.keys(b.params||{}).filter(k=>typeof b.params[k]==='number'); if(keys.length){ ph+='<div class="grid2">'+keys.map(k=>'<div><label>'+k+'</label><input type="number" class="behP" data-i="'+i+'" data-k="'+k+'" value="'+b.params[k]+'"></div>').join('')+'</div>'; }
+      if(ROLE_CLIPS[b.type]){ const av=(a?a.clipNames:[]); const nd=ROLE_CLIPS[b.type]; const miss=nd.filter(c=>av.indexOf(c)<0); ph+='<p class="note" style="margin-top:3px">Animações: '+nd.join(', ')+(miss.length?(' <span style="color:var(--danger)">(faltando: '+miss.join(', ')+')</span>'):' ✓')+'</p>'; } }
     d.innerHTML=ph; w.appendChild(d); });
   w.querySelectorAll('.rmBeh').forEach(btn=>btn.onclick=()=>{ sel.behaviors.splice(+btn.dataset.i,1); refreshInspector(); touch(); });
   w.querySelectorAll('.behP').forEach(inp=>inp.oninput=()=>{ sel.behaviors[+inp.dataset.i].params[inp.dataset.k]=+inp.value; touch(); });
@@ -851,7 +866,7 @@ function touch(){ g('saveDot').textContent='salvando...'; clearTimeout(saveT); s
 /* ============ EXPORTAR JOGO (HTML jogável) ============ */
 function buildExportHTML(){
   const scene=exportScene();
-  const fnList=[_ac,_beep,playSnd,spawnRT,SXof,SYof,frameCanvas,computeBBox,buildAsset,assetById,w2s,s2w,drawLayered,drawEntity,draw,solid,collideX,collideY,moveE,overlap,hasClip,autoClip,hasAnimator,respawn,clipDur,clipDurAsset,setLockClip,setNodeClip,flowCond,apiFor,loop,makeTouchUI];
+  const fnList=[_ac,_beep,playSnd,spawnRT,_enemyTick,_shootAt,_nearest,SXof,SYof,frameCanvas,computeBBox,buildAsset,assetById,w2s,s2w,drawLayered,drawEntity,draw,solid,collideX,collideY,moveE,overlap,hasClip,autoClip,hasAnimator,respawn,clipDur,clipDurAsset,setLockClip,setNodeClip,flowCond,apiFor,loop,makeTouchUI];
   const fnSrc=fnList.map(f=>f.toString()).join('\n');
   const behSrc='const BEH={'+Object.keys(BEH).map(k=>JSON.stringify(k)+':'+BEH[k].toString()).join(',\n')+'};';
   const inputSrc="const Input={ get left(){return !!(Keys['ArrowLeft']||Keys['KeyA']);}, get right(){return !!(Keys['ArrowRight']||Keys['KeyD']);}, get up(){return !!(Keys['ArrowUp']||Keys['KeyW']);}, get down(){return !!(Keys['ArrowDown']||Keys['KeyS']);}, get jump(){return !!(Keys['Space']||Keys['ArrowUp']||Keys['KeyW']);}, get action(){return !!(Keys['KeyJ']||Keys['KeyZ']);}, key(c){return !!Keys[c];} };";
@@ -958,7 +973,8 @@ function heroFrame(step){ const w=12,h=16,a=new Array(w*h).fill('');
   else if(step===1){ R(4,12,5,15,'#5a3a20'); R(6,12,7,15,'#5a3a20'); }
   else { R(2,12,3,15,'#5a3a20'); R(8,12,9,15,'#5a3a20'); }
   return a; }
-function makeHero(){ return { w:12,h:16, clips:{ idle:[heroFrame(0),heroFrame(1)], andar:[heroFrame(0),heroFrame(1),heroFrame(2),heroFrame(1)] } }; }
+function heroShoot(){ const a=heroFrame(0).slice(); a[8*12+10]='#8a5a34'; a[8*12+11]='#8a5a34'; a[9*12+11]='#8a5a34'; return a; }
+function makeHero(){ return { w:12,h:16, clips:{ idle:[heroFrame(0),heroFrame(1)], andar:[heroFrame(0),heroFrame(1),heroFrame(2),heroFrame(1)], atira:[heroShoot()] } }; }
 function makeCoin(){ const w=8,h=8,a=new Array(w*h).fill(''); for(let y=0;y<h;y++)for(let x=0;x<w;x++){ const dx=x-3.5,dy=y-3.5,d=dx*dx+dy*dy; if(d<=10) a[y*w+x]=(d<=4?'#ffe680':'#f1c40f'); } return { w:w,h:h, clips:{ idle:[a] } }; }
 function exampleProject(kind){ const hero=makeHero(), coin=makeCoin();
   const assets=[{id:'hero',name:'heroi',raw:hero},{id:'coin',name:'moeda',raw:coin}]; const grid={};
@@ -1079,7 +1095,7 @@ function enemyFrame(step){ const w=12,h=14,a=new Array(w*h).fill('');
   P(4,6,'#ffffff'); P(7,6,'#ffffff'); P(4,7,'#141414'); P(7,7,'#141414');
   if(step===0){ R(3,13,4,13,'#3a206a'); R(7,13,8,13,'#3a206a'); } else { R(4,13,5,13,'#3a206a'); R(6,13,7,13,'#3a206a'); }
   return a; }
-function makeEnemy(){ return {w:12,h:14,clips:{idle:[enemyFrame(0),enemyFrame(1)],andar:[enemyFrame(0),enemyFrame(1)]}}; }
+function makeEnemy(){ return {w:12,h:14,clips:{idle:[enemyFrame(0),enemyFrame(1)],andar:[enemyFrame(0),enemyFrame(1)],atira:[enemyFrame(0)]}}; }
 function makeSpike(){ const w=12,h=8,a=new Array(w*h).fill(''); for(let s=0;s<3;s++){ const cx=2+s*4; for(let y=0;y<6;y++){ const half=Math.floor((6-y)/2); for(let x=cx-half;x<=cx+half;x++) if(x>=0&&x<w)a[(y+2)*w+x]='#c0392b'; } } return {w:w,h:h,clips:{idle:[a]}}; }
 function genGameFromText(desc){ const t=(desc||'').toLowerCase(); const rnd=(a,b)=>a+Math.floor(Math.random()*(b-a+1)); const has=(...k)=>k.some(x=>t.indexOf(x)>=0);
   const shooter=has('soul knight','soulknight','tiro','atira','atirar','roguelike','shooter','arma','pistola','tiroteio'); const topdown=shooter||has('top','de cima','masmorra','labirinto','zelda','dungeon','aventura de cima'); const mode=topdown?'topdown':'platformer';
@@ -1093,7 +1109,7 @@ function genGameFromText(desc){ const t=(desc||'').toLowerCase(); const rnd=(a,b
   else if(has('cidade','urbano','rua')){bg='#0d0d12';tile='#5a5a66';}
   const assets=[{id:'hero',name:'heroi',raw:makeHero()},{id:'coin',name:'moeda',raw:makeCoin()},{id:'enemy',name:'inimigo',raw:makeEnemy()},{id:'spike',name:'espinho',raw:makeSpike()},{id:'bala',name:'bala',raw:makeBullet()}];
   const grid={}, ents=[], T=32; const ent=(id,x,y,beh,script)=>({id:'e'+Math.random().toString(36).slice(2,8),name:id,x:x,y:y,asset:id,clip:'idle',sx:2,sy:2,fps:8,flip:false,layer:'L2',behaviors:beh||[],script:script||''});
-  const wantEnemies=has('inimigo','monstro','perseg','zumbi','vilão','vilao','fantasma','bicho')||Math.random()<0.6;
+  const wantEnemies=has('inimigo','monstro','perseg','zumbi','vilão','vilao','fantasma','bicho')||Math.random()<0.6; const wantAllies=has('aliado','aliados','companheiro','ajudante','amigo','parceiro');
   const wantCoins=!has('sem moeda','nada de moeda'); const wantSpikes=has('espinho','perigo','armadilha','lava','obstacul','espeto','espinhos');
   const nE=(wantEnemies||shooter)?rnd(3,5):0, nC=wantCoins?rnd(3,6):0, nS=wantSpikes?rnd(2,4):0;
   if(mode==='platformer'){
@@ -1101,13 +1117,15 @@ function genGameFromText(desc){ const t=(desc||'').toLowerCase(); const rnd=(a,b
     const plats=rnd(3,5); for(let i=0;i<plats;i++){ const px=4+rnd(0,26), py=6+rnd(0,4), len=rnd(2,4); for(let j=0;j<len;j++)grid[(px+j)+','+py]=1; }
     ents.push(ent('hero',2*T,9*T,[{type:'player-platformer',params:{speed:200,jump:560}},{type:'animator',params:{parado:'idle',andando:'andar',pulando:'idle',caindo:'idle'}}]));
     for(let i=0;i<nC;i++) ents.push(ent('coin',(5+i*4)*T+8,(5+rnd(0,5))*T,[{type:'collectible',params:{value:1}}]));
-    for(let i=0;i<nE;i++) ents.push(ent('enemy',(8+i*6)*T,11*T,[{type:'inimigo',params:{vida:3}},{type:'animator',params:{parado:'idle',andando:'andar'}}],EXAMPLES['persegue-pula']));
+    for(let i=0;i<nE;i++){ const ty=Math.random()<0.5?'inimigo-persegue':'inimigo-patrulha'; const pr=ty==='inimigo-patrulha'?{vida:3,velocidade:60,distancia:96}:{vida:3,velocidade:90}; ents.push(ent('enemy',(8+i*6)*T,11*T,[{type:ty,params:pr},{type:'animator',params:{parado:'idle',andando:'andar'}}])); }
+    if(wantAllies){ const ab=shooter?{type:'aliado-atira',params:{velocidade:130,alcance:420,cadencia:0.5,velocidadeBala:320}}:{type:'aliado-segue',params:{velocidade:140}}; ents.push(ent('hero',4*T,9*T,[ab,{type:'animator',params:{parado:'idle',andando:'andar'}}])); }
     for(let i=0;i<nS;i++) ents.push(ent('spike',(10+i*5)*T,11*T+16,[{type:'hazard',params:{}}]));
   } else {
     for(let x=2;x<=24;x++){grid[x+',2']=1;grid[x+',16']=1;} for(let y=2;y<=16;y++){grid['2,'+y]=1;grid['24,'+y]=1;}
     { const pbeh=[{type:'player-topdown',params:{speed:160}},{type:'animator',params:{parado:'idle',andando:'andar'}}]; if(shooter)pbeh.push({type:'atirador',params:{velocidade:360,cadencia:0.28,alcance:440}}); ents.push(ent('hero',13*T,9*T,pbeh)); }
     for(let i=0;i<nC;i++) ents.push(ent('coin',(4+rnd(0,18))*T,(4+rnd(0,11))*T,[{type:'collectible',params:{value:1}}]));
-    for(let i=0;i<nE;i++) ents.push(ent('enemy',(5+rnd(0,16))*T,(5+rnd(0,9))*T,[{type:'inimigo',params:{vida:3}},{type:'animator',params:{parado:'idle',andando:'andar'}}],EXAMPLES['seguir-suave']));
+    for(let i=0;i<nE;i++){ const ty=(shooter&&Math.random()<0.5)?'inimigo-atira':'inimigo-persegue'; const pr=ty==='inimigo-atira'?{vida:3,velocidade:40,alcance:300,cadencia:1.1,velocidadeBala:260}:{vida:3,velocidade:90}; ents.push(ent('enemy',(5+rnd(0,16))*T,(5+rnd(0,9))*T,[{type:ty,params:pr},{type:'animator',params:{parado:'idle',andando:'andar'}}])); }
+    if(wantAllies){ const ab=shooter?{type:'aliado-atira',params:{velocidade:130,alcance:420,cadencia:0.5,velocidadeBala:320}}:{type:'aliado-segue',params:{velocidade:140}}; ents.push(ent('hero',11*T,9*T,[ab,{type:'animator',params:{parado:'idle',andando:'andar'}}])); }
     for(let i=0;i<nS;i++) ents.push(ent('spike',(6+rnd(0,15))*T,(6+rnd(0,8))*T,[{type:'hazard',params:{}}]));
   }
   const scene={name:'fase 1',mode:mode,tile:T,gravity:mode==='platformer'?1800:0,bg:bg,tileColor:tile,grid:grid,layers:[{id:'L1',name:'Cenário',visible:true},{id:'L2',name:'Objetos',visible:true}],active:'L2',entities:ents};
@@ -1122,6 +1140,9 @@ function spawnRT(o){ const a=assetById(o.asset); const bb=a?a.bbox:{x:0,y:0,w:6,
   const rt={id:'s'+Math.random().toString(36).slice(2,7),name:o.name||'bala',asset:o.asset,baseAsset:o.asset,clip:o.clip||(a?a.clipNames[0]:'idle'),fps:o.fps||10,sx:sx,sy:sy,flip:false,layer:o.layer||'L2',
     x:o.x,y:o.y,w:Math.max(2,bb.w*sx),h:Math.max(2,bb.h*sy),vx:o.vx||0,vy:o.vy||0,onGround:false,_t:0,behaviors:o.behaviors||[{type:'projetil',params:{dano:1}}],script:'',state:{},dead:false,_born:(RUN?RUN.t:0),life:o.life||2,tag:o.tag};
   if(RUN)RUN.ents.push(rt); return rt; }
+function _enemyTick(e,p){ if(e.hp===undefined)e.hp=+p.vida||3; e.isEnemy=true; const pl=RUN.player; if(pl&&overlap(e,pl)){ respawn(pl); playSnd('dano'); } if(e.hp<=0){ e.dead=true; RUN.score=(RUN.score||0)+1; playSnd('moeda'); return false; } return true; }
+function _shootAt(e,tx,ty,v,team){ const cx=e.x+e.w/2, cy=e.y+e.h/2, d=Math.hypot(tx-cx,ty-cy)||1; const ba=assetById('bala'); const bw=ba?ba.bbox.w*2:8,bh=ba?ba.bbox.h*2:8; spawnRT({asset:'bala',x:cx-bw/2,y:cy-bh/2,vx:(tx-cx)/d*v,vy:(ty-cy)/d*v,life:2,behaviors:[{type:'projetil',params:{dano:1,team:team||'good'}}]}); playSnd('tiro'); }
+function _nearest(x,y,pred){ let best=null,bd=1e9; for(const z of RUN.ents){ if(!z.dead&&pred(z)){ const d=Math.hypot((z.x+z.w/2)-x,(z.y+z.h/2)-y); if(d<bd){bd=d;best=z;} } } return best; }
 
 /* ============ SOM (efeitos) ============ */
 function _ac(){ if(!_actx){ try{ _actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ _actx=null; } } return _actx; }
