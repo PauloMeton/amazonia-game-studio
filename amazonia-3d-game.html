@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Amazônia 3D — Jogo (beta)</title>
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<style>
+  :root{--bg:#0f1a12;--panel:#16241a;--line:#2c4a36;--txt:#dff3e6;--muted:#8fb89c;--accent:#7FFFD4;--danger:#ff6b6b}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:system-ui,sans-serif;overflow:hidden}
+  #ui{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:7px 10px;background:rgba(16,26,18,.92);border-bottom:1px solid var(--line)}
+  #ui .logo{font-weight:700;color:var(--accent);margin-right:6px}
+  button{font:inherit;font-size:12px;cursor:pointer;border-radius:6px;border:1px solid var(--line);background:#1d3025;color:var(--txt);padding:6px 9px}
+  button:hover{border-color:var(--accent);color:var(--accent)}
+  button.on{background:#1f4a35;border-color:var(--accent);color:var(--accent)}
+  button.primary{background:#1f4a35;border-color:var(--accent);color:var(--accent)}
+  input[type=color]{width:30px;height:28px;padding:1px;border:1px solid var(--line);border-radius:5px;background:#0c1610}
+  .sep{width:1px;height:22px;background:var(--line);margin:0 3px}
+  #hint{position:fixed;bottom:8px;left:8px;z-index:50;font-size:12px;color:var(--muted);background:rgba(0,0,0,.4);padding:5px 9px;border-radius:6px}
+  a-scene{position:fixed;inset:0}
+</style>
+</head>
+<body>
+<div id="ui">
+  <span class="logo">AMAZÔNIA 3D <small style="color:var(--muted);font-weight:400">beta</small></span>
+  <button id="tPlace" class="on">＋ Colocar</button>
+  <button id="tSelect">✦ Selecionar</button>
+  <span class="sep"></span>
+  <button class="kind on" data-k="cubo">Cubo</button>
+  <button class="kind" data-k="parede">Parede</button>
+  <button class="kind" data-k="esfera">Esfera</button>
+  <button class="kind" data-k="cilindro">Cilindro</button>
+  <input type="color" id="col" value="#8a5a34">
+  <button id="del" class="danger" style="border-color:#5a2b2b;color:var(--danger)">🗑 Apagar</button>
+  <span class="sep"></span>
+  <button id="setStart">📍 Player aqui</button>
+  <button id="play" class="primary">▶ Jogar</button>
+  <button id="stop" style="display:none">■ Parar</button>
+  <span class="sep"></span>
+  <button id="rotL">⟲</button><button id="rotR">⟳</button><button id="zin">+</button><button id="zout">−</button>
+  <button id="save">💾</button><button id="open">📂</button><input type="file" id="file" accept=".json" style="display:none"><button id="novo">Novo</button>
+</div>
+<div id="hint">Coloque blocos clicando no chão (ou em cima de outro pra empilhar). 📍 marca onde o player nasce. ▶ Jogar: WASD anda, mouse olha, Espaço pula, Esc/Parar volta.</div>
+
+<a-scene id="scene" cursor="rayOrigin: mouse" raycaster="objects: .ray; far: 300" vr-mode-ui="enabled: false" background="color: #0a0f0c">
+  <a-light type="ambient" color="#8899aa" intensity="0.7"></a-light>
+  <a-light type="directional" position="4 10 6" intensity="0.8"></a-light>
+  <a-sky color="#0a141c"></a-sky>
+  <a-entity id="rig" rotation="0 0 0"><a-entity id="cam" camera="active: true" position="0 14 20" rotation="-34 0 0" look-controls="enabled: false"></a-entity></a-entity>
+  <a-plane id="ground" class="ray" rotation="-90 0 0" width="120" height="120" position="0 0 0" material="color: #2e7d32; side: double"></a-plane>
+  <a-entity id="marker" visible="false" position="0 0.05 0"><a-ring rotation="-90 0 0" radius-inner="0.35" radius-outer="0.5" material="color: #7FFFD4; side: double"></a-ring><a-cone position="0 0.9 0" radius-bottom="0.25" radius-top="0" height="0.5" material="color:#D4AF37"></a-cone></a-entity>
+  <a-entity id="world"></a-entity>
+</a-scene>
+
+<script>
+const $=id=>document.getElementById(id);
+const scene=$('scene'), world=$('world'), rig=$('rig'), cam=$('cam'), ground=$('ground'), marker=$('marker');
+let tool='place', kind='cubo', color='#8a5a34', sel=null, playing=false, start={x:0,z:0}, idc=0;
+
+/* grade no chão */
+function gridTex(){ const c=document.createElement('canvas'); c.width=c.height=64; const x=c.getContext('2d'); x.fillStyle='#2e7d32'; x.fillRect(0,0,64,64); x.strokeStyle='rgba(0,0,0,.25)'; x.lineWidth=2; x.strokeRect(0,0,64,64); return c.toDataURL(); }
+
+/* colocar objeto numa célula */
+function makeObj(o){ const e=document.createElement('a-entity'); e.classList.add('ray','editable','solid'); e._d={x:o.x,y:o.y,z:o.z,type:o.type,color:o.color}; idc++; e.id='o'+idc;
+  let g;
+  if(o.type==='parede'){ g='primitive: box; height: 2; width: 1; depth: 1'; e.setAttribute('position', o.x+' '+(o.y+0.5)+' '+o.z); e._d.tall=true; }
+  else if(o.type==='esfera'){ g='primitive: sphere; radius: 0.5'; e.setAttribute('position', o.x+' '+o.y+' '+o.z); }
+  else if(o.type==='cilindro'){ g='primitive: cylinder; radius: 0.5; height: 1'; e.setAttribute('position', o.x+' '+o.y+' '+o.z); }
+  else { g='primitive: box; height: 1; width: 1; depth: 1'; e.setAttribute('position', o.x+' '+o.y+' '+o.z); }
+  e.setAttribute('geometry', g); e.setAttribute('material','color: '+o.color);
+  world.appendChild(e); return e; }
+
+function place(p){ const gx=Math.floor(p.x)+0.5, gz=Math.floor(p.z)+0.5; const gy=Math.round(p.y-0.5)+0.5+ (p.y>0.6?1:0);
+  // empilhar: se clicou em cima de um objeto, sobe um nível
+  let cy=0.5; const cell=Math.round(p.y); if(cell>=1) cy=cell+0.5;
+  makeObj({x:gx,y:cy,z:gz,type:kind,color:color}); save(); }
+
+function selectEl(e){ if(sel){ sel.setAttribute('material','color: '+sel._d.color); } sel=e; if(e) e.setAttribute('material','color: #D4AF37; emissive: #553; '); }
+
+/* clique na cena */
+scene.addEventListener('click', ev=>{ if(playing) return; const it=ev.detail.intersection; if(!it) return; const o=ev.detail.intersectedEl;
+  if(tool==='select'){ if(o&&o.classList.contains('editable')) selectEl(o); else selectEl(null); return; }
+  if(tool==='setstart'){ start={x:Math.floor(it.point.x)+0.5,z:Math.floor(it.point.z)+0.5}; marker.setAttribute('position', start.x+' 0.05 '+start.z); marker.setAttribute('visible','true'); tool='place'; setTool('place'); save(); return; }
+  place(it.point); });
+
+/* câmera orbital */
+$('rotL').onclick=()=>{ rig.object3D.rotation.y+=0.25; };
+$('rotR').onclick=()=>{ rig.object3D.rotation.y-=0.25; };
+$('zin').onclick=()=>{ const p=cam.object3D.position; p.multiplyScalar(0.88); };
+$('zout').onclick=()=>{ const p=cam.object3D.position; p.multiplyScalar(1.14); };
+
+/* ferramentas */
+function setTool(t){ tool=t; $('tPlace').classList.toggle('on',t==='place'); $('tSelect').classList.toggle('on',t==='select'); }
+$('tPlace').onclick=()=>setTool('place'); $('tSelect').onclick=()=>setTool('select');
+$('setStart').onclick=()=>{ tool='setstart'; $('tPlace').classList.remove('on'); $('tSelect').classList.remove('on'); };
+document.querySelectorAll('.kind').forEach(b=>b.onclick=()=>{ kind=b.dataset.k; document.querySelectorAll('.kind').forEach(x=>x.classList.toggle('on',x===b)); setTool('place'); });
+$('col').oninput=e=>{ color=e.target.value; if(sel){ sel._d.color=color; sel.setAttribute('material','color: '+color); save(); } };
+$('del').onclick=()=>{ if(sel){ sel.parentNode.removeChild(sel); sel=null; save(); } };
+document.addEventListener('keydown',e=>{ if(playing){ if(e.code==='Escape')stopPlay(); return; } if(e.key==='Delete'&&sel){ sel.parentNode.removeChild(sel); sel=null; save(); } });
+
+/* jogar (1ª pessoa) */
+AFRAME.registerComponent('fpsmove',{
+  init(){ this.keys={}; this.vy=0; this.onG=false; this.kd=e=>this.keys[e.code]=true; this.ku=e=>this.keys[e.code]=false; window.addEventListener('keydown',this.kd); window.addEventListener('keyup',this.ku); },
+  remove(){ window.removeEventListener('keydown',this.kd); window.removeEventListener('keyup',this.ku); },
+  tick(t,dtms){ const dt=Math.min(0.05,(dtms||16)/1000); const o=this.el.object3D.position; const k=this.keys;
+    const camEl=this.el.querySelector('[camera]'); const yaw=camEl?camEl.object3D.rotation.y:0;
+    let f=0,s=0; if(k['KeyW']||k['ArrowUp'])f+=1; if(k['KeyS']||k['ArrowDown'])f-=1; if(k['KeyD']||k['ArrowRight'])s+=1; if(k['KeyA']||k['ArrowLeft'])s-=1;
+    const spd=4.5, sin=Math.sin(yaw), cos=Math.cos(yaw);
+    const dx=(-sin*f + cos*s)*spd*dt, dz=(-cos*f - sin*s)*spd*dt;
+    this.vy-=15*dt; if(k['Space']&&this.onG){ this.vy=6.5; this.onG=false; }
+    o.x+=dx; this.collH('x',dx,o); o.z+=dz; this.collH('z',dz,o); o.y+=this.vy*dt; this.collV(o);
+  },
+  boxes(){ return Array.from(document.querySelectorAll('#world .solid')); },
+  collH(ax,dv,o){ const r=0.35; for(const el of this.boxes()){ const p=el.object3D.position; const hh=el._d&&el._d.tall?1:0.5; if(o.y-1.6>p.y+hh||o.y+0.1<p.y-hh)continue;
+      if(ax==='x'){ if(Math.abs(o.z-p.z)<0.5+r&&Math.abs(o.x-p.x)<0.5+r){ o.x = dv>0? p.x-0.5-r : p.x+0.5+r; } }
+      else { if(Math.abs(o.x-p.x)<0.5+r&&Math.abs(o.z-p.z)<0.5+r){ o.z = dv>0? p.z-0.5-r : p.z+0.5+r; } } } },
+  collV(o){ const r=0.35; this.onG=false; if(o.y<1.6){ o.y=1.6; this.vy=0; this.onG=true; }
+    for(const el of this.boxes()){ const p=el.object3D.position; const hh=el._d&&el._d.tall?1:0.5; if(Math.abs(o.x-p.x)<0.5+r&&Math.abs(o.z-p.z)<0.5+r){ const top=p.y+hh+1.6; if(this.vy<=0&&o.y<=top+0.05&&o.y>top-0.7){ o.y=top; this.vy=0; this.onG=true; } } } }
+});
+function startPlay(){ if(playing)return; playing=true; $('play').style.display='none'; $('stop').style.display='';
+  cam.setAttribute('camera','active:false');
+  const pl=document.createElement('a-entity'); pl.id='player'; pl.setAttribute('position', start.x+' 1.6 '+start.z);
+  const c=document.createElement('a-entity'); c.setAttribute('camera','active: true'); c.setAttribute('look-controls','pointerLockEnabled: true'); pl.appendChild(c);
+  pl.setAttribute('fpsmove',''); scene.appendChild(pl); window._pl=pl; }
+function stopPlay(){ if(!playing)return; playing=false; $('play').style.display=''; $('stop').style.display='none';
+  if(window._pl){ window._pl.parentNode.removeChild(window._pl); window._pl=null; } cam.setAttribute('camera','active: true'); if(document.exitPointerLock)document.exitPointerLock(); }
+$('play').onclick=startPlay; $('stop').onclick=stopPlay;
+
+/* salvar / carregar */
+function serialize(){ const objs=Array.from(world.children).map(e=>e._d); return {v:1,objects:objs,start:start}; }
+function clearWorld(){ while(world.firstChild)world.removeChild(world.firstChild); sel=null; }
+function load(o){ clearWorld(); (o.objects||[]).forEach(d=>makeObj(d)); start=o.start||{x:0,z:0}; marker.setAttribute('position',start.x+' 0.05 '+start.z); marker.setAttribute('visible','true'); }
+function save(){ try{ localStorage.setItem('a3d_proj',JSON.stringify(serialize())); }catch(e){} }
+$('save').onclick=()=>{ const b=new Blob([JSON.stringify(serialize())],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='jogo-3d.json'; a.click(); };
+$('open').onclick=()=>$('file').click();
+$('file').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{ load(JSON.parse(r.result)); save(); }catch(x){ alert('JSON inválido'); } }; r.readAsText(f); e.target.value=''; };
+$('novo').onclick=()=>{ if(confirm('Começar do zero?')){ clearWorld(); start={x:0,z:0}; save(); } };
+
+/* boot */
+function boot(){ ground.setAttribute('material',{src:gridTex(), repeat:'120 120', color:'#2e7d32', side:'double'});
+  let loaded=false; try{ const r=localStorage.getItem('a3d_proj'); if(r){ load(JSON.parse(r)); loaded=true; } }catch(e){}
+  if(!loaded){ marker.setAttribute('visible','true'); }
+}
+if(scene.hasLoaded) boot(); else scene.addEventListener('loaded', boot);
+</script>
+</body>
+</html>

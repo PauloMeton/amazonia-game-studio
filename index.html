@@ -234,6 +234,27 @@ if(this.enemies().length===0) this.win();"></textarea>
   </div>
 </div>
 
+<div id="game3d" style="display:none;position:fixed;inset:0;z-index:16000;background:#070d09;flex-direction:column">
+  <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line)">
+    <b style="color:var(--accent)">Jogo 3D (beta)</b>
+    <span class="note">monte a cena 3D e jogue em 1ª pessoa — salva sozinho</span>
+    <div style="flex:1"></div>
+    <button id="g3dClose">Fechar</button>
+  </div>
+  <iframe id="frameG3d" title="Jogo 3D" style="flex:1;border:0;width:100%;background:#0f1a12"></iframe>
+</div>
+
+<div id="editor3d" style="display:none;position:fixed;inset:0;z-index:16000;background:#070d09;flex-direction:column">
+  <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line)">
+    <b style="color:var(--accent)">Editor 3D</b>
+    <span class="note">modele, posicione a câmera e clique em "Usar no jogo" — vira um sprite 2D na biblioteca</span>
+    <div style="flex:1"></div>
+    <button class="primary" id="threeUse">➕ Usar no jogo (sprite)</button>
+    <button id="threeClose">Fechar</button>
+  </div>
+  <iframe id="frame3d" title="Editor 3D" style="flex:1;border:0;width:100%;background:#0f1a12"></iframe>
+</div>
+
 <div id="artEditor" style="display:none;position:fixed;inset:0;z-index:16000;background:#070d09;flex-direction:column">
   <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line)">
     <b style="color:var(--accent)">Editor de Arte</b>
@@ -261,6 +282,8 @@ if(this.enemies().length===0) this.win();"></textarea>
     <button id="cloudBtn" class="hide">☁ Salvar</button>
     <button id="profileBtn" class="hide">Perfil</button>
     <button id="btnArt">🎨 Editor de Arte</button>
+    <button id="btn3d">🧊 Editor 3D</button>
+    <button id="btnG3d">🎮 Jogo 3D</button>
     <button id="btnNew">Novo</button>
     <button id="btnExportJson">.json</button>
     <button id="btnExportGame">⬇ Exportar jogo</button>
@@ -1063,6 +1086,17 @@ function loadCourse(kind){ if(!confirm('Carregar o projeto-modelo? O projeto atu
 /* ============ EDITOR DE ARTE (módulo) ============ */
 function openArtEditor(){ const f=g('artFrame'); if(!f.getAttribute('src')) f.setAttribute('src','amazonia-pixel-studio.html'); g('artEditor').style.display='flex'; }
 function closeArtEditor(){ g('artEditor').style.display='none'; }
+function open3D(){ const f=g('frame3d'); if(!f.getAttribute('src')) f.setAttribute('src','amazonia-asset-studio.html'); g('editor3d').style.display='flex'; }
+function close3D(){ g('editor3d').style.display='none'; }
+function openG3d(){ const f=g('frameG3d'); if(!f.getAttribute('src')) f.setAttribute('src','amazonia-3d-game.html'); g('game3d').style.display='flex'; }
+function closeG3d(){ g('game3d').style.display='none'; }
+function convert3D(url){ if(!url){ logMsg('Não consegui capturar o modelo 3D.'); return; } const img=new Image(); img.onload=()=>{ try{
+  const MAX=48, sc=Math.min(MAX/img.width,MAX/img.height), w=Math.max(1,Math.round(img.width*sc)), h=Math.max(1,Math.round(img.height*sc));
+  const oc=document.createElement('canvas'); oc.width=w; oc.height=h; const ox=oc.getContext('2d'); ox.imageSmoothingEnabled=true; ox.drawImage(img,0,0,w,h);
+  const d=ox.getImageData(0,0,w,h).data, bg=[d[0],d[1],d[2]], fr=new Array(w*h).fill('');
+  for(let i=0;i<w*h;i++){ const R=d[i*4],G=d[i*4+1],B=d[i*4+2],A=d[i*4+3]; if(A<40)continue; if(Math.abs(R-bg[0])+Math.abs(G-bg[1])+Math.abs(B-bg[2])<60)continue; fr[i]='#'+[R,G,B].map(v=>('0'+v.toString(16)).slice(-2)).join(''); }
+  addAsset({w:w,h:h,clips:{idle:[fr]}}, 'modelo-3d'); logMsg('🧊 Sprite do modelo 3D adicionado à biblioteca de objetos.');
+}catch(e){ logMsg('Erro ao converter o 3D: '+e.message); } }; img.onerror=()=>logMsg('Imagem 3D inválida.'); img.src=url; }
 
 /* ============ EXPORTAR COMO APP (PWA) ============ */
 function genIcon(size){ const c=document.createElement('canvas'); c.width=c.height=size; const x=c.getContext('2d'); x.fillStyle='#0f1a12'; x.fillRect(0,0,size,size);
@@ -1283,7 +1317,10 @@ function wire(){ buildTools(); setTool('select');
   g('loadCoursePlat').onclick=()=>loadCourse('platformer'); g('loadCourseTop').onclick=()=>loadCourse('topdown');
   g('flowClose').onclick=()=>Flow.close(); g('flowAddNode').onchange=e=>{ if(e.target.value&&Flow.p){ Flow.p.nodes.push({id:'n'+uid(),clip:e.target.value,x:40,y:40}); if(!Flow.p.start)Flow.p.start=Flow.p.nodes[Flow.p.nodes.length-1].id; e.target.value=''; Flow.render(); touch(); } };
   g('artUse').onclick=()=>{ const f=g('artFrame'); if(f&&f.contentWindow)f.contentWindow.postMessage({type:'amz_getProject'},'*'); else logMsg('Editor de arte não está aberto.'); };
-  window.addEventListener('message',e=>{ const d=e.data; if(d&&d.type==='amz_project'){ const p=projFromAny(d.data); if(p){ importArt(p,(d.data&&d.data.name)||'arte'); closeArtEditor(); } else logMsg('Arte recebida vazia.'); } });
+  g('btn3d').onclick=open3D; g('threeClose').onclick=close3D;
+  g('btnG3d').onclick=openG3d; g('g3dClose').onclick=closeG3d;
+  g('threeUse').onclick=()=>{ const f=g('frame3d'); if(f&&f.contentWindow){ f.contentWindow.postMessage({type:'amz_get3D'},'*'); logMsg('Capturando o modelo 3D...'); } };
+  window.addEventListener('message',e=>{ const d=e.data; if(d&&d.type==='amz_project'){ const p=projFromAny(d.data); if(p){ importArt(p,(d.data&&d.data.name)||'arte'); closeArtEditor(); } else logMsg('Arte recebida vazia.'); } if(d&&d.type==='amz_3dimage'){ convert3D(d.data); close3D(); } });
   document.addEventListener('keydown',e=>{ if(RUN)return; if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return; if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){ e.preventDefault(); if(e.shiftKey)redo(); else undo(); return; } if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){ e.preventDefault(); redo(); return; } if(e.key==='Delete'&&sel){ SC.entities=SC.entities.filter(z=>z!==sel); select(null); touch(); } });
 }
 function boot(){ wire(); initFB();
