@@ -82,6 +82,27 @@
   .asset.sel{box-shadow:0 0 0 1px rgba(127,255,212,.25)}
   .vtools button{backdrop-filter:blur(4px)}
   .modal .auth-card{box-shadow:0 20px 60px #000c;border-radius:14px}
+  /* ==== Toast ==== */
+  #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:22000;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+  #toast .t{background:#12251a;border:1px solid var(--accent);color:#dff3e6;padding:8px 14px;border-radius:10px;box-shadow:0 8px 24px #000a;font-size:13px;opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s;max-width:90vw;text-align:center}
+  #toast .t.show{opacity:1;transform:translateY(0)}
+  /* ==== Paineis (mobile) ==== */
+  #panelToggles{display:none;gap:6px}
+  #panelBackdrop{display:none}
+  @media (max-width:1024px){ .main{grid-template-columns:200px 1fr 210px} }
+  @media (max-width:820px){
+    #panelToggles{display:flex}
+    header{gap:6px;padding:6px 8px}
+    header .logo{font-size:.95em}
+    .main{grid-template-columns:1fr}
+    .side{position:fixed;top:0;bottom:0;z-index:9000;width:84%;max-width:320px;transition:transform .22s ease}
+    .side.left{left:0;transform:translateX(-104%);border-right:1px solid var(--line)}
+    .side.right{right:0;transform:translateX(104%);border-left:1px solid var(--line)}
+    .side.left.open,.side.right.open{transform:translateX(0);box-shadow:0 0 50px #000d}
+    #panelBackdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:8500}
+    #panelBackdrop.on{display:block}
+    #log{height:64px}
+  }
 </style>
 </head>
 <body>
@@ -300,6 +321,7 @@ if(this.enemies().length===0) this.win();"></textarea>
 <div class="app">
   <header>
     <div class="logo">AMAZÔNIA <small>Game Studio</small></div>
+    <div id="panelToggles"><button id="tglLeft" title="Painéis (ferramentas)">☰</button><button id="tglRight" title="Inspetor">ℹ️</button></div>
     <input id="projName" value="meu-jogo" style="max-width:150px">
     <span class="note" id="saveDot">salvo</span>
     <button class="primary" id="btnPlay">▶ Jogar</button>
@@ -326,7 +348,7 @@ if(this.enemies().length===0) this.win();"></textarea>
   </header>
 
   <div class="main">
-    <div class="side left">
+    <div class="side left" id="sideLeft">
       <div class="card"><h3>Cena</h3>
         <label>Tipo de jogo</label>
         <select id="modeSel"><option value="platformer">Plataforma (lateral)</option><option value="topdown">Top-down (visto de cima)</option></select>
@@ -383,7 +405,7 @@ if(this.enemies().length===0) this.win();"></textarea>
       <div id="stage">
         <canvas id="game"></canvas>
         <div class="vtools">
-          <button id="undoBtn" title="Desfazer (Ctrl+Z)">↶</button><button id="redoBtn" title="Refazer (Ctrl+Y)">↷</button><button id="zoomIn">+</button><button id="zoomOut">−</button><button id="zoomReset">⤢</button><button id="pview" title="Ver a visão do player">👁</button>
+          <button id="undoBtn" title="Desfazer (Ctrl+Z)">↶</button><button id="redoBtn" title="Refazer (Ctrl+Y)">↷</button><button id="zoomIn" title="Aproximar">+</button><button id="zoomOut" title="Afastar">−</button><button id="zoomReset" title="Enquadrar tudo">⤢</button><button id="pview" title="Ver a visão do player">👁</button>
         </div>
         <div id="pvPanel" style="display:none;position:absolute;right:10px;bottom:10px;z-index:30;background:#0a120d;border:1px solid var(--accent);border-radius:8px;padding:6px;box-shadow:0 8px 26px #000b">
           <div id="pvHead" style="margin-bottom:4px;color:var(--accent);font-weight:600;font-size:11px;cursor:move;user-select:none">👁 Tela do player <span style="color:var(--muted);font-weight:400">⠿ arraste</span></div>
@@ -394,7 +416,7 @@ if(this.enemies().length===0) this.win();"></textarea>
       <div id="log"></div>
     </div>
 
-    <div class="side right">
+    <div class="side right" id="sideRight">
       <div class="card"><h3>Inspetor</h3><div id="insp"><p class="note">Selecione um objeto na cena (ferramenta Selecionar).</p></div></div>
     </div>
   </div>
@@ -565,7 +587,7 @@ const TButtons={ sel:null, _drag:null, _mv:null, _up:null,
     h+='<label>Função</label><select id="tbFunc">'+FUNC_OPTS.map(o=>'<option value="'+o[0]+'"'+(b.key===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>';
     h+='<label style="margin-top:6px">Rótulo (texto)</label><input id="tbLabel" value="'+esc(b.label||'')+'" placeholder="'+esc(funcLabel(b.key))+'">';
     h+='<label style="margin-top:6px">Tamanho: '+(b.r||60)+'px</label><input type="range" id="tbSize" min="40" max="110" value="'+(b.r||60)+'">';
-    h+='<label style="margin-top:6px">Posição fina</label><div class="grid2"><button id="tbNL">◀</button><button id="tbNR">▶</button></div><div class="grid2" style="margin-top:4px"><button id="tbNU">▲</button><button id="tbND">▼</button></div>';
+    h+='<label style="margin-top:6px">Posição fina</label><div class="grid2"><button id="tbNL" title="Mover 1px p/ esquerda">◀</button><button id="tbNR" title="Mover 1px p/ direita">▶</button></div><div class="grid2" style="margin-top:4px"><button id="tbNU" title="Mover 1px p/ cima">▲</button><button id="tbND" title="Mover 1px p/ baixo">▼</button></div>';
     h+='<button class="danger" id="tbDel" style="width:100%;margin-top:8px">remover botão</button>'; w.innerHTML=h;
     g('tbFunc').onchange=e=>{ b.key=e.target.value; this.render(); touch(); };
     g('tbLabel').oninput=e=>{ b.label=e.target.value; this.render(); touch(); };
@@ -853,7 +875,10 @@ function loop(now){ if(!RUN)return; const dt=Math.min(0.05,(now-RUN.last)/1000);
   }catch(err){ logMsg('⚠ Erro no jogo: '+err.message); }
   if(RUN)RUN.raf=requestAnimationFrame(loop); }
 /* ============ LOG ============ */
-function logMsg(m){ const l=g('log'); l.textContent+=(l.textContent?'\n':'')+m; l.scrollTop=l.scrollHeight; }
+function logMsg(m){ const l=g('log'); l.textContent+=(l.textContent?'\n':'')+m; l.scrollTop=l.scrollHeight; try{toast(m);}catch(e){} }
+function toast(m){ try{ const w=document.getElementById('toast'); if(!w)return; const d=document.createElement('div'); d.className='t'; d.textContent=m; w.appendChild(d); requestAnimationFrame(()=>d.classList.add('show')); setTimeout(()=>{ d.classList.remove('show'); setTimeout(()=>d.remove(),260); },2600); }catch(e){} }
+function closePanels(){ const l=document.getElementById('sideLeft'),r=document.getElementById('sideRight'),b=document.getElementById('panelBackdrop'); l&&l.classList.remove('open'); r&&r.classList.remove('open'); b&&b.classList.remove('on'); }
+function togglePanel(which){ const el=document.getElementById(which==='left'?'sideLeft':'sideRight'); const ot=document.getElementById(which==='left'?'sideRight':'sideLeft'); if(!el)return; ot&&ot.classList.remove('open'); const op=el.classList.toggle('open'); const b=document.getElementById('panelBackdrop'); if(b)b.classList.toggle('on',op); }
 function esc(s){ return (''+s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 /* ============ FERRAMENTAS ============ */
@@ -1399,7 +1424,8 @@ async function cenaGenerate(){ if(!Cena.img){ g('cenaOut').textContent='Escolha 
   jobs.push({id:'coin',prompt:cenaSpritePrompt('collectible pickup item coin', A.coinColor, theme, descText),fb:makeCoin,max:26});
   if(tags.includes('perigo')) jobs.push({id:'spike',prompt:cenaSpritePrompt('dangerous spike trap hazard', '', theme, descText),fb:makeSpike,max:30});
   if(tags.includes('saida')) jobs.push({id:'exit',prompt:cenaSpritePrompt('glowing exit portal goal door', '', theme, descText),fb:makeCoin,max:30});
-  let raws; try{ raws=await Promise.all(jobs.map(j=>cenaGenSprite(j.prompt,j.fb,j.max))); }catch(e){ raws=jobs.map(j=>j.fb()); }
+  let raws; let _dn=0; const _tot=jobs.length; const _up=()=>{ if(g('cenaOut'))g('cenaOut').textContent='🎨 Gerando sprites com a IA… '+_dn+'/'+_tot; }; _up();
+  try{ raws=await Promise.all(jobs.map(j=>cenaGenSprite(j.prompt,j.fb,j.max).then(r=>{ _dn++; _up(); return r; }))); }catch(e){ raws=jobs.map(j=>j.fb()); }
   const R={}; jobs.forEach((j,i)=>R[j.id]=raws[i]||j.fb());
   const assets=[{id:'hero',name:'heroi',raw:R.hero}];
   groups.forEach(gr=>assets.push({id:gr.id,name:'inimigo '+gr.colorName,raw:R[gr.id]}));
@@ -1509,6 +1535,13 @@ function wire(){ buildTools(); setTool('select');
   g('cenaDel').onclick=()=>{ if(Cena.sel>=0){ Cena.boxes.splice(Cena.sel,1); Cena.sel=-1; cenaRenderPalette(); cenaDraw(); } };
   g('cenaGen').onclick=cenaGenerate; g('cenaAI').onclick=cenaAI;
   if(g('cenaDesc'))g('cenaDesc').oninput=()=>{ Cena.descEdited=true; };
+  if(g('tglLeft'))g('tglLeft').onclick=()=>togglePanel('left');
+  if(g('tglRight'))g('tglRight').onclick=()=>togglePanel('right');
+  if(g('panelBackdrop'))g('panelBackdrop').onclick=closePanels;
+  const _wflag=()=>{ try{localStorage.setItem('gs_welcomed','1');}catch(e){} };
+  if(g('welcomeStart'))g('welcomeStart').onclick=()=>{ g('welcomeModal').classList.remove('open'); _wflag(); };
+  if(g('welcomeTut'))g('welcomeTut').onclick=()=>{ g('welcomeModal').classList.remove('open'); _wflag(); g('tutModal').classList.add('open'); };
+  if(g('welcomeExample'))g('welcomeExample').onclick=()=>{ g('welcomeModal').classList.remove('open'); _wflag(); try{ loadProject(exampleProject('platformer')); toast('Exemplo carregado — clique em ▶ Jogar!'); }catch(e){ logMsg('Erro ao carregar exemplo: '+e.message); } };
   (function(){ const cv=g('cenaCanvas'); if(cv){ cv.addEventListener('mousedown',e=>cenaMouse(e,'down')); window.addEventListener('mousemove',e=>{ if(Cena.drag)cenaMouse(e,'move'); }); window.addEventListener('mouseup',e=>{ if(Cena.drag)cenaMouse(e,'up'); }); } })();
   g('genRun').onclick=()=>gerarJogo(); g('genIn').addEventListener('keydown',e=>{ if(e.key==='Enter')gerarJogo(); });
   document.querySelectorAll('.genPre').forEach(b=>b.onclick=()=>{ g('genIn').value=b.dataset.d; gerarJogo(); });
@@ -1525,8 +1558,21 @@ function boot(){ wire(); initFB();
   let loaded=false; try{ const r=localStorage.getItem('game_proj'); if(r){ loadProject(JSON.parse(r)); loaded=true; } }catch(e){}
   if(!loaded){ syncSceneInputs(); renderAssets(); renderLayers(); renderScenes(); resetHistory(); }
   resize(); logMsg('Bem-vindo ao Game Studio! 1) Importe suas artes  2) Pinte plataformas  3) Coloque objetos  4) Dê um comportamento de Player  5) ▶ Jogar.');
+  if(!loaded){ try{ if(!localStorage.getItem('gs_welcomed')) g('welcomeModal').classList.add('open'); }catch(e){} }
 }
 boot();
 </script>
+<div id="panelBackdrop"></div>
+<div id="toast"></div>
+<div id="welcomeModal" class="modal">
+  <div class="auth-card" style="width:460px;max-width:94%">
+    <div class="auth-logo" style="font-size:1.2em">👋 Bem-vindo ao Game Studio</div>
+    <p class="note">Crie jogos 2D no navegador. Como você quer começar?</p>
+    <button class="primary" id="welcomeExample">🎮 Ver um jogo de exemplo (recomendado)</button>
+    <button id="welcomeTut">❓ Abrir o tutorial</button>
+    <button id="welcomeStart">✏️ Começar do zero</button>
+    <p class="note">Dica: ▶ Jogar testa na hora • Ctrl+Z desfaz • no celular use ☰ para abrir os painéis.</p>
+  </div>
+</div>
 </body>
 </html>
