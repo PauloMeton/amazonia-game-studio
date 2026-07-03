@@ -1368,47 +1368,64 @@ function cenaAnalyze(fill){ if(!Cena.img) return {}; const theme=cenaTheme(); co
   const A={theme:theme,mode:mode,playerDesc:playerDesc,enemyDesc:enemyDesc,coinDesc:coinDesc,playerColor:pc,enemyColor:ec,coinColor:cc,desc:desc}; Cena.analysis=A; if(fill&&g('cenaDesc'))g('cenaDesc').value=desc; return A; }
 function cenaSpritePrompt(role,objColor,theme,ctx){ return '16-bit pixel art game sprite of the '+role+(objColor?(' colored '+objColor):'')+', '+(theme||'')+' theme'+(ctx?('. Scene: '+ctx):'')+'. single character, full body, centered, solid flat white background, high contrast, no text, no shadow'; }
 function imgUrlToPixelRaw(url,MAX){ return new Promise(function(resolve){ const img=new Image(); img.crossOrigin='anonymous'; let done=false; const to=setTimeout(function(){ if(!done){done=true;resolve(null);} },22000);
-  img.onload=function(){ if(done)return; done=true; clearTimeout(to); try{ const sc=Math.min(MAX/img.width,MAX/img.height,1), w=Math.max(8,Math.round(img.width*sc)), h=Math.max(8,Math.round(img.height*sc)); const oc=document.createElement('canvas'); oc.width=w; oc.height=h; const ox=oc.getContext('2d'); ox.imageSmoothingEnabled=true; ox.drawImage(img,0,0,w,h); const d=ox.getImageData(0,0,w,h).data; const bg=[d[0],d[1],d[2]]; const fr=new Array(w*h).fill(''); const step=40; let solid=0; for(let i=0;i<w*h;i++){ const R=d[i*4],G=d[i*4+1],B=d[i*4+2],A=d[i*4+3]; if(A<50)continue; if(Math.abs(R-bg[0])+Math.abs(G-bg[1])+Math.abs(B-bg[2])<70)continue; if(R>235&&G>235&&B>235)continue; const q=v=>Math.min(255,Math.round(v/step)*step); fr[i]='#'+[q(R),q(G),q(B)].map(v=>('0'+v.toString(16)).slice(-2)).join(''); solid++; } if(solid<6){ resolve(null); return; } resolve({w:w,h:h,clips:{idle:[fr],andar:[fr],atira:[fr]}}); }catch(e){ resolve(null); } };
+  img.onload=function(){ if(done)return; done=true; clearTimeout(to); try{ const sc=Math.min(MAX/img.width,MAX/img.height,1), w=Math.max(8,Math.round(img.width*sc)), h=Math.max(8,Math.round(img.height*sc)); const oc=document.createElement('canvas'); oc.width=w; oc.height=h; const ox=oc.getContext('2d'); ox.imageSmoothingEnabled=true; ox.drawImage(img,0,0,w,h); const d=ox.getImageData(0,0,w,h).data;
+    const cn=[[d[0],d[1],d[2]],[d[(w-1)*4],d[(w-1)*4+1],d[(w-1)*4+2]],[d[w*(h-1)*4],d[w*(h-1)*4+1],d[w*(h-1)*4+2]],[d[(w*h-1)*4],d[(w*h-1)*4+1],d[(w*h-1)*4+2]]]; const bg=[0,1,2].map(k=>Math.round((cn[0][k]+cn[1][k]+cn[2][k]+cn[3][k])/4));
+    const fr=new Array(w*h).fill(''); const step=36; let solid=0,minx=w,maxx=-1,miny=h,maxy=-1;
+    for(let i=0;i<w*h;i++){ const R=d[i*4],G=d[i*4+1],B=d[i*4+2],A=d[i*4+3]; if(A<60)continue; if(Math.abs(R-bg[0])+Math.abs(G-bg[1])+Math.abs(B-bg[2])<85)continue; if(R>232&&G>232&&B>232)continue; const q=v=>Math.min(255,Math.round(v/step)*step); fr[i]='#'+[q(R),q(G),q(B)].map(v=>('0'+v.toString(16)).slice(-2)).join(''); solid++; const x=i%w,y=(i/w)|0; if(x<minx)minx=x; if(x>maxx)maxx=x; if(y<miny)miny=y; if(y>maxy)maxy=y; }
+    if(solid<8){ resolve(null); return; }
+    minx=Math.max(0,minx-1); miny=Math.max(0,miny-1); maxx=Math.min(w-1,maxx+1); maxy=Math.min(h-1,maxy+1); const tw=maxx-minx+1, th=maxy-miny+1; const out=new Array(tw*th).fill('');
+    for(let y=0;y<th;y++)for(let x=0;x<tw;x++){ out[y*tw+x]=fr[(y+miny)*w+(x+minx)]; }
+    resolve({w:tw,h:th,clips:{idle:[out],andar:[out],atira:[out]}}); }catch(e){ resolve(null); } };
   img.onerror=function(){ if(done)return; done=true; clearTimeout(to); resolve(null); };
   img.src=url; }); }
-function cenaGenSprite(prompt,fallback){ return new Promise(function(resolve){ let ok=false; const url='https://image.pollinations.ai/prompt/'+encodeURIComponent(prompt)+'?width=96&height=96&nologo=true&seed='+Math.floor(Math.random()*99999); imgUrlToPixelRaw(url,28).then(function(raw){ if(raw){ ok=true; resolve(raw); } else resolve(fallback()); }).catch(function(){ resolve(fallback()); }); }); }
+function cenaGenSprite(prompt,fallback,max){ return new Promise(function(resolve){ const url='https://image.pollinations.ai/prompt/'+encodeURIComponent(prompt)+'?width=128&height=128&nologo=true&seed='+Math.floor(Math.random()*99999); imgUrlToPixelRaw(url,max||32).then(function(raw){ resolve(raw||fallback()); }).catch(function(){ resolve(fallback()); }); }); }
+function cenaModeFromText(t){ t=(t||'').toLowerCase(); if(/top-?down|de cima|visto de cima|vista superior|masmorra|labirinto|zelda|dungeon|aerea|aérea|top view|top-view/.test(t))return 'topdown'; if(/plataforma|lateral|side-?scroll|side scroller|corredor lateral|jump/.test(t))return 'platformer'; return ''; }
 async function cenaGenerate(){ if(!Cena.img){ g('cenaOut').textContent='Escolha uma imagem primeiro.'; return; } if(!Cena.boxes.length){ cenaAutoDetect(); }
   if(!confirm('A IA vai analisar a imagem, criar SPRITES NOVOS a partir da descrição e montar o jogo. O projeto atual fica salvo localmente até você salvar de novo.')) return;
   const A=Cena.analysis||cenaAnalyze(false); let descText=(g('cenaDesc')&&g('cenaDesc').value.trim())||'';
   if(!Cena.descEdited){ g('cenaOut').textContent='🔎 A IA está olhando a imagem…'; try{ const v=await cenaVisionDescribe(); if(v){ descText=v; if(g('cenaDesc'))g('cenaDesc').value=v; } }catch(e){} }
   if(!descText) descText=A.desc||'';
-  const theme=cenaThemeFromText(descText)||A.theme||'floresta'; const mode=(g('cenaMode')?g('cenaMode').value:A.mode)||'platformer';
+  const theme=cenaThemeFromText(descText)||A.theme||'floresta';
+  const ground=Cena.boxes.find(b=>b.tag==='chao'&&b.y>Cena.img.h*0.5&&b.w>Cena.img.w*0.5);
+  let mode=cenaModeFromText(descText)||(ground?'platformer':(g('cenaMode')?g('cenaMode').value:'platformer')); if(g('cenaMode'))g('cenaMode').value=mode;
+  const tags=Cena.boxes.map(b=>b.tag);
+  // agrupar inimigos por cor -> tipos
+  const groups=[]; Cena.boxes.filter(b=>b.tag==='inimigo').forEach(b=>{ const c=cenaBoxColor(b); let gi=groups.findIndex(gr=>Math.abs(gr.color[0]-c[0])+Math.abs(gr.color[1]-c[1])+Math.abs(gr.color[2]-c[2])<95); if(gi<0){ if(groups.length<3){ gi=groups.length; groups.push({color:c,id:'enemy'+gi,colorName:cenaColorName(c)}); } else gi=0; } b._eg=groups[gi].id; });
+  if(!groups.length && tags.includes('inimigo')) groups.push({color:[200,60,60],id:'enemy0',colorName:'vermelho'});
   g('cenaOut').textContent='🎨 Criando sprites novos com a IA (pode levar alguns segundos)…';
   const TH={floresta:['#08160d','#2e7d32'],caverna:['#0b0b10','#4a4a55'],gelo:['#0a1622','#5aa0c0'],deserto:['#1c1408','#c2a25a'],lava:['#160707','#a83a1a'],'espaço':['#05050f','#39406e'],cidade:['#0d0d12','#5a5a66']}; const tc=TH[theme]||['#0a0f0c','#3a5d44'];
-  let heroRaw,enemyRaw,coinRaw;
-  try{
-    const r=await Promise.all([
-      cenaGenSprite(cenaSpritePrompt('main hero player character', A.playerColor, theme, descText), makeHero),
-      cenaGenSprite(cenaSpritePrompt('enemy creature monster', A.enemyColor, theme, descText), makeEnemy),
-      cenaGenSprite(cenaSpritePrompt('collectible pickup item', A.coinColor, theme, descText), makeCoin)
-    ]);
-    heroRaw=r[0]; enemyRaw=r[1]; coinRaw=r[2];
-  }catch(e){ heroRaw=makeHero(); enemyRaw=makeEnemy(); coinRaw=makeCoin(); }
-  const assets=[{id:'hero',name:'heroi',raw:heroRaw},{id:'coin',name:'moeda',raw:coinRaw},{id:'enemy',name:'inimigo',raw:enemyRaw},{id:'spike',name:'espinho',raw:makeSpike()},{id:'bala',name:'bala',raw:makeBullet()}];
+  const jobs=[]; jobs.push({id:'hero',prompt:cenaSpritePrompt('main hero player character', A.playerColor, theme, descText),fb:makeHero,max:36});
+  groups.forEach(gr=>jobs.push({id:gr.id,prompt:cenaSpritePrompt('enemy creature monster ('+gr.colorName+')', gr.colorName, theme, descText),fb:makeEnemy,max:36}));
+  jobs.push({id:'coin',prompt:cenaSpritePrompt('collectible pickup item coin', A.coinColor, theme, descText),fb:makeCoin,max:26});
+  if(tags.includes('perigo')) jobs.push({id:'spike',prompt:cenaSpritePrompt('dangerous spike trap hazard', '', theme, descText),fb:makeSpike,max:30});
+  if(tags.includes('saida')) jobs.push({id:'exit',prompt:cenaSpritePrompt('glowing exit portal goal door', '', theme, descText),fb:makeCoin,max:30});
+  let raws; try{ raws=await Promise.all(jobs.map(j=>cenaGenSprite(j.prompt,j.fb,j.max))); }catch(e){ raws=jobs.map(j=>j.fb()); }
+  const R={}; jobs.forEach((j,i)=>R[j.id]=raws[i]||j.fb());
+  const assets=[{id:'hero',name:'heroi',raw:R.hero}];
+  groups.forEach(gr=>assets.push({id:gr.id,name:'inimigo '+gr.colorName,raw:R[gr.id]}));
+  assets.push({id:'coin',name:'moeda',raw:R.coin||makeCoin()});
+  assets.push({id:'spike',name:'espinho',raw:R.spike||makeSpike()});
+  assets.push({id:'exit',name:'saida',raw:R.exit||makeCoin()});
+  assets.push({id:'bala',name:'bala',raw:makeBullet()});
   const T=32, IW=Cena.img.w, IH=Cena.img.h; const grid={}, ents=[]; const uid2=()=>'e'+Math.random().toString(36).slice(2,8);
-  const ent=(id,x,y,beh,nm)=>({id:uid2(),name:nm||id,x:Math.round(x),y:Math.round(y),asset:id,clip:'idle',sx:2,sy:2,fps:8,flip:false,layer:'L2',behaviors:beh||[],script:''});
+  const ent=(id,x,y,beh,nm,sx,sy)=>({id:uid2(),name:nm||id,x:Math.round(x),y:Math.round(y),asset:id,clip:'idle',sx:sx||2,sy:sy||2,fps:8,flip:false,layer:'L2',behaviors:beh||[],script:''});
   const fillGrid=b=>{ const c0=Math.floor(b.x/T),c1=Math.floor((b.x+b.w-1)/T),r0=Math.floor(b.y/T),r1=Math.floor((b.y+b.h-1)/T); for(let r=r0;r<=r1;r++)for(let c=c0;c<=c1;c++)grid[c+','+r]=1; };
   let hasSaida=false, playerBox=null;
   Cena.boxes.forEach(b=>{ const cx0=b.x+b.w/2, cy0=b.y+b.h/2;
     if(b.tag==='chao'||b.tag==='parede'){ fillGrid(b); }
     else if(b.tag==='player'){ playerBox=b; }
-    else if(b.tag==='inimigo'){ const beh=mode==='platformer'?[{type:'inimigo-patrulha',params:{vida:3,velocidade:60,distancia:Math.max(64,Math.round(b.w))}},{type:'animator',params:{parado:'idle',andando:'andar'}}]:[{type:'inimigo-persegue',params:{vida:3,velocidade:90}},{type:'animator',params:{parado:'idle',andando:'andar'}}]; ents.push(ent('enemy',cx0-24,(b.y+b.h)-56,beh)); }
-    else if(b.tag==='moeda'){ ents.push(ent('coin',cx0-24,cy0-24,[{type:'collectible',params:{value:1}}])); }
-    else if(b.tag==='perigo'){ const e=ent('spike',b.x,(b.y+b.h)-16,[{type:'hazard',params:{}}]); e.sx=Math.max(1,Math.round(b.w/12)); e.sy=Math.max(1,Math.round(b.h/8)); ents.push(e); }
-    else if(b.tag==='saida'){ hasSaida=true; const e=ent('coin',cx0-24,cy0-24,[{type:'collectible',params:{value:1}}],'saida'); e.sx=3; e.sy=3; ents.push(e); }
+    else if(b.tag==='inimigo'){ const beh=mode==='platformer'?[{type:'inimigo-patrulha',params:{vida:3,velocidade:60,distancia:Math.max(64,Math.round(b.w))}},{type:'animator',params:{parado:'idle',andando:'andar'}}]:[{type:'inimigo-persegue',params:{vida:3,velocidade:90}},{type:'animator',params:{parado:'idle',andando:'andar'}}]; ents.push(ent(b._eg||'enemy0',cx0-24,b.y,beh)); }
+    else if(b.tag==='moeda'){ ents.push(ent('coin',cx0-14,cy0-14,[{type:'collectible',params:{value:1}}])); }
+    else if(b.tag==='perigo'){ ents.push(ent('spike',cx0-16,(b.y+b.h)-28,[{type:'hazard',params:{}}])); }
+    else if(b.tag==='saida'){ hasSaida=true; ents.push(ent('exit',cx0-16,cy0-16,[{type:'collectible',params:{value:1}}],'saida',3,3)); }
   });
   const pb=playerBox||{x:Math.round(IW*0.04),y:IH-64,w:20,h:32};
   const pbeh=mode==='platformer'?[{type:'player-platformer',params:{speed:200,jump:560}},{type:'animator',params:{parado:'idle',andando:'andar',pulando:'idle',caindo:'idle'}}]:[{type:'player-topdown',params:{speed:170}},{type:'animator',params:{parado:'idle',andando:'andar'}}];
-  ents.unshift(ent('hero',pb.x+pb.w/2-24,(pb.y+pb.h)-56,pbeh,'player'));
+  ents.unshift(ent('hero',pb.x+pb.w/2-24,pb.y,pbeh,'player'));
   const globalScript=hasSaida?"var a=gameApi(dt); if(!a.find('saida')) a.win();":'';
   const scene={name:'cenário',mode:mode,tile:T,gravity:mode==='platformer'?1800:0,bg:tc[0],tileColor:tc[1],bgImage:'',bgW:0,bgH:0,bgLayers:[],grid:grid,layers:[{id:'L1',name:'Cenário',visible:true},{id:'L2',name:'Objetos',visible:true}],active:'L2',globalScript:globalScript,entities:ents};
   const proj={v:2,name:'jogo-da-analise',cur:0,target:'desktop',touchctl:'auto',camZoom:1,sound:true,assets:assets,scenes:[scene]};
-  loadProject(proj); cenaClose(); touch(); logMsg('🎨 Jogo criado! A IA analisou a imagem, gerou sprites novos e montou a fase. Clique em ▶ Jogar.'); }
+  loadProject(proj); cenaClose(); touch(); logMsg('🎨 Jogo criado! A IA analisou a imagem, gerou sprites novos ('+assets.length+' tipos) e montou a fase ('+mode+'). Clique ▶ Jogar.'); }
 
 
 /* ============ SOM (efeitos) ============ */
