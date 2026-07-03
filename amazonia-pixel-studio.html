@@ -65,6 +65,12 @@
     button{min-height:40px}
     .frame canvas{width:46px;height:46px}
   }
+  /* ==== Toast + Confirm ==== */
+  #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:22000;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+  #toast .t{background:#12251a;border:1px solid var(--accent);color:#dff3e6;padding:8px 14px;border-radius:10px;box-shadow:0 8px 24px #000a;font-size:13px;opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s;max-width:90vw;text-align:center}
+  #toast .t.show{opacity:1;transform:translateY(0)}
+  #confirmModal{display:none;position:fixed;inset:0;z-index:21000;background:rgba(0,0,0,.62);align-items:center;justify-content:center}
+  #confirmModal.open{display:flex}
 </style>
 </head>
 <body>
@@ -330,7 +336,7 @@ const Cloud={ db:null, uid:null,
     try{ await this.col().add({name:g('projName').value||'pixel-art', data:JSON.stringify(serialize()), updatedAt:Date.now()}); Profile.msg('Salvo na nuvem.'); if(g('profile').style.display!=='none') Profile.refresh(); }catch(e){ Profile.open(); Profile.msg('Erro: '+e.message); } },
   async list(){ if(!this.db) return []; const s=await this.col().orderBy('updatedAt','desc').get(); return s.docs.map(d=>Object.assign({id:d.id},d.data())); },
   async open(id){ const d=await this.col().doc(id).get(); if(!d.exists)return; deserialize(JSON.parse(d.data().data)); Profile.close(); },
-  async del(id){ if(!confirm('Excluir?'))return; await this.col().doc(id).delete(); Profile.refresh(); } };
+  async del(id){ if(!await confirmDialog('Excluir esta arte da nuvem?'))return; await this.col().doc(id).delete(); Profile.refresh(); } };
 const Profile={ open(){ g('profile').style.display='flex'; this.refresh(); }, close(){ g('profile').style.display='none'; }, msg(t){ const m=g('prof-msg'); if(m)m.textContent=t; },
   async refresh(){ const u=(Auth.auth&&Auth.auth.currentUser)?Auth.auth.currentUser:null; g('prof-email').textContent=u?u.email:'(modo local)'; const list=g('prof-list');
     if(!Cloud.db){ list.innerHTML='<p class="note">Modo local — faça login pra salvar/abrir na nuvem.</p>'; return; }
@@ -491,13 +497,17 @@ const Sheet={ img:null, bands:[], colsB:[], bg:[0,0,0], _data:null, _iw:0, _ih:0
 };
 
 /* ============ APP / PERSIST ============ */
+let _confResolve=null;
+function confirmDialog(msg){ return new Promise(res=>{ const m=document.getElementById('confirmModal'); if(!m){res(window.confirm(msg));return;} document.getElementById('confirmMsg').textContent=msg; m.classList.add('open'); _confResolve=res; }); }
+function _confirmDo(v){ const m=document.getElementById('confirmModal'); if(m)m.classList.remove('open'); if(_confResolve){_confResolve(v);_confResolve=null;} }
+function toast(m){ try{ const w=document.getElementById('toast'); if(!w)return; const d=document.createElement('div'); d.className='t'; d.textContent=m; w.appendChild(d); requestAnimationFrame(()=>d.classList.add('show')); setTimeout(()=>{ d.classList.remove('show'); setTimeout(()=>d.remove(),260); },2600);}catch(e){} }
 const App={ t:null,
   touch(){ S.name=g('projName').value; g('saveDot').textContent='salvando...'; clearTimeout(this.t); this.t=setTimeout(()=>{ try{localStorage.setItem('px_proj',JSON.stringify(serialize()));}catch(e){} g('saveDot').textContent='salvo'; },400); },
   safe(){ return (S.name||'pixel').toLowerCase().replace(/[^a-z0-9\-]+/g,'-').replace(/^-+|-+$/g,'')||'pixel'; },
-  newProj(){ if(!confirm('Nova arte? A atual será apagada (use .json antes).'))return; S=blank(); g('projName').value=S.name; boot2(); App.touch(); },
-  resizeNew(){ const w=Math.max(1,Math.min(256,+g('newW').value||32)), h=Math.max(1,Math.min(256,+g('newH').value||32)); if(!confirm('Criar nova tela '+w+'x'+h+'? (apaga o desenho atual)'))return; S=blank(); S.w=w; S.h=h; S.frames=[new Array(w*h).fill('')]; boot2(); App.touch(); },
-  saveJSON(){ dl('data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(serialize(),null,2)), App.safe()+'.json'); },
-  openJSON(ev){ const f=ev.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{ deserialize(JSON.parse(r.result)); }catch(e){ alert('JSON inválido'); } }; r.readAsText(f); ev.target.value=''; },
+  newProj(){ confirmDialog('Nova arte? A atual será apagada (use .json antes).').then(ok=>{ if(!ok)return; S=blank(); g('projName').value=S.name; boot2(); App.touch(); toast('Nova arte criada.'); }); },
+  resizeNew(){ const w=Math.max(1,Math.min(256,+g('newW').value||32)), h=Math.max(1,Math.min(256,+g('newH').value||32)); confirmDialog('Criar nova tela '+w+'x'+h+'? (apaga o desenho atual)').then(ok=>{ if(!ok)return; S=blank(); S.w=w; S.h=h; S.frames=[new Array(w*h).fill('')]; boot2(); App.touch(); toast('Tela '+w+'x'+h+' criada.'); }); },
+  saveJSON(){ dl('data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(serialize(),null,2)), App.safe()+'.json'); toast('Arquivo .json baixado.'); },
+  openJSON(ev){ const f=ev.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{ deserialize(JSON.parse(r.result)); toast('Arte importada.'); }catch(e){ toast('JSON inválido.'); } }; r.readAsText(f); ev.target.value=''; },
   drawer(){ const p=document.querySelector('.side.right'), b=document.getElementById('backdrop'), c=document.getElementById('drawerClose'); const open=!p.classList.contains('open'); p.classList.toggle('open',open); b.classList.toggle('show',open); if(c) c.style.display=open?'block':'none'; } };
 function ffp(base, p){ const dx=p.dx||0, dy=p.dy||0, sx=p.sx||1, sy=p.sy||1, flip=p.flip?1:0;
   let minx=S.w,maxx=0,miny=S.h,maxy=0,any=false;
@@ -588,5 +598,11 @@ window.addEventListener('load', boot);
   if(window.parent!==window){ try{ const h=document.querySelector('header'); if(h){ const b=document.createElement('button'); b.textContent='✅ Usar no jogo'; b.className='primary'; b.style.marginLeft='6px'; b.onclick=snd; h.appendChild(b); } }catch(e){} }
 })();
 </script>
+<div id="confirmModal"><div class="auth-card" style="width:380px;max-width:92%">
+  <div class="auth-logo" style="font-size:1.05em">Confirmar</div>
+  <p class="note" id="confirmMsg" style="font-size:13px;color:#dff3e6"></p>
+  <div class="row" style="justify-content:flex-end;gap:8px"><button onclick="_confirmDo(false)">Cancelar</button><button class="primary" onclick="_confirmDo(true)">Confirmar</button></div>
+</div></div>
+<div id="toast"></div>
 </body>
 </html>

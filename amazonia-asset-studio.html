@@ -107,6 +107,26 @@
   .kfmarks{display:flex;flex-wrap:wrap;gap:4px;max-width:520px}
   .kfmarks .kf{font-size:10px;padding:2px 7px;border:1px solid var(--line);border-radius:10px;background:#0c1610;cursor:pointer;color:var(--muted)}
   .kfmarks .kf:hover{border-color:var(--accent);color:var(--accent)}
+  /* ==== Toast + Confirm + Responsivo ==== */
+  #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:22000;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+  #toast .t{background:#12251a;border:1px solid var(--accent);color:#dff3e6;padding:8px 14px;border-radius:10px;box-shadow:0 8px 24px #000a;font-size:13px;opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s;max-width:90vw;text-align:center}
+  #toast .t.show{opacity:1;transform:translateY(0)}
+  #confirmModal{display:none;position:fixed;inset:0;z-index:21000;background:rgba(0,0,0,.62);align-items:center;justify-content:center}
+  #confirmModal.open{display:flex}
+  #panelToggles{display:none;gap:6px}
+  #panelBackdrop{display:none}
+  @media (max-width:1024px){ .main{grid-template-columns:210px 1fr 220px} }
+  @media (max-width:860px){
+    #panelToggles{display:flex}
+    header{flex-wrap:wrap;gap:6px;padding:6px 8px}
+    .main{grid-template-columns:1fr}
+    .side{position:fixed;top:0;bottom:0;z-index:9000;width:85%;max-width:320px;transition:transform .22s ease;overflow-y:auto}
+    .side.left{left:0;transform:translateX(-104%)}
+    .side.right{right:0;transform:translateX(104%)}
+    .side.left.open,.side.right.open{transform:translateX(0);box-shadow:0 0 50px #000d}
+    #panelBackdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:8500}
+    #panelBackdrop.on{display:block}
+  }
 </style>
 </head>
 <body>
@@ -146,6 +166,7 @@
 
   <header>
     <div class="logo">AMAZÔNIA <small>Asset Studio</small></div>
+    <div id="panelToggles"><button onclick="togglePanel('left')" title="Painéis">☰</button><button onclick="togglePanel('right')" title="Painel direito">ℹ️</button></div>
     <div class="tabs">
       <button id="tab-model" class="active" onclick="UI.tab('model')">Modelo</button>
       <button id="tab-env" onclick="UI.tab('env')">Ambientes</button>
@@ -167,7 +188,7 @@
   <div class="main">
 
     <!-- ===================== LEFT PANEL ===================== -->
-    <div class="side left">
+    <div class="side left" id="sideLeft">
 
       <div id="panel-model-left">
         <div class="card">
@@ -335,7 +356,7 @@
     </div>
 
     <!-- ===================== RIGHT PANEL ===================== -->
-    <div class="side right">
+    <div class="side right" id="sideRight">
 
       <div id="panel-inspector">
         <div class="card" id="inspectorEmpty">
@@ -1457,24 +1478,24 @@ function csgToPositions(csg){ const polys=csg.toPolygons(), out=[];
   polys.forEach(p=>{ const vv=p.vertices; for(let i=2;i<vv.length;i++){ const a=vv[0].pos,b=vv[i-1].pos,c=vv[i].pos; out.push(a.x,a.y,a.z,b.x,b.y,b.z,c.x,c.y,c.z); } }); return out; }
 const Boolean3D = {
   op(kind){
-    if(typeof CSG==='undefined'){ alert('Biblioteca de corte (CSG) nao carregou — precisa de internet na 1a vez.'); return; }
+    if(typeof CSG==='undefined'){ toast('Biblioteca de corte (CSG) nao carregou — precisa de internet na 1a vez.'); return; }
     const arr=Array.from(multiSel);
-    if(arr.length!==2){ alert('Selecione exatamente 2 pecas com Ctrl+clique. Em "Cortar", a 1a perde o volume da 2a.'); return; }
+    if(arr.length!==2){ toast('Selecione exatamente 2 pecas com Ctrl+clique. Em "Cortar", a 1a perde o volume da 2a.'); return; }
     const na=state.nodes.find(x=>x.id===arr[0]), nb=state.nodes.find(x=>x.id===arr[1]);
     const ea=Scene.elOf(na.id), eb=Scene.elOf(nb.id);
     const ma=ea&&ea.getObject3D('mesh'), mb=eb&&eb.getObject3D('mesh');
-    if(!ma||!mb){ alert('As duas pecas precisam ter geometria (nao use grupos).'); return; }
+    if(!ma||!mb){ toast('As duas pecas precisam ter geometria (nao use grupos).'); return; }
     try{
       const A=meshToCSG(ma), B=meshToCSG(mb);
       let R; if(kind==='union') R=A.union(B); else if(kind==='subtract') R=A.subtract(B); else R=A.intersect(B);
       const pos=csgToPositions(R);
-      if(!pos.length){ alert('Resultado vazio (as pecas talvez nao se cruzem).'); return; }
+      if(!pos.length){ toast('Resultado vazio (as pecas talvez nao se cruzem).'); return; }
       const node=makeNode('mesh', na.parent||null);
       node.name = kind==='union'?'uniao':(kind==='subtract'?'corte':'interseccao');
       node.color=na.color; node.mat=JSON.parse(JSON.stringify(na.mat)); node.geom={pos:pos};
       [na.id,nb.id].forEach(id=>{ const kill=new Set(); (function rec(x){kill.add(x); childrenOf(x).forEach(c=>rec(c.id));})(id); state.nodes=state.nodes.filter(z=>!kill.has(z.id)); });
       state.nodes.push(node); state.selectedId=node.id; multiSel.clear(); Scene.rebuild(); UI.refresh(); App.touch();
-    }catch(e){ alert('Erro no booleano: '+e.message); }
+    }catch(e){ toast('Erro no booleano: '+e.message); }
   }
 };
 
@@ -1884,6 +1905,12 @@ const History = {
 };
 
 /* ============================ APP / PERSIST ============================ */
+let _confResolve=null;
+function confirmDialog(msg){ return new Promise(res=>{ const m=document.getElementById('confirmModal'); if(!m){res(window.confirm(msg));return;} document.getElementById('confirmMsg').textContent=msg; m.classList.add('open'); _confResolve=res; }); }
+function _confirmDo(v){ const m=document.getElementById('confirmModal'); if(m)m.classList.remove('open'); if(_confResolve){_confResolve(v);_confResolve=null;} }
+function toast(m){ try{ const w=document.getElementById('toast'); if(!w)return; const d=document.createElement('div'); d.className='t'; d.textContent=m; w.appendChild(d); requestAnimationFrame(()=>d.classList.add('show')); setTimeout(()=>{ d.classList.remove('show'); setTimeout(()=>d.remove(),260); },2600);}catch(e){} }
+function togglePanel(which){ const el=document.getElementById(which==='left'?'sideLeft':'sideRight'); const ot=document.getElementById(which==='left'?'sideRight':'sideLeft'); if(!el)return; ot&&ot.classList.remove('open'); const op=el.classList.toggle('open'); const b=document.getElementById('panelBackdrop'); if(b)b.classList.toggle('on',op); }
+function closePanels(){ ['sideLeft','sideRight'].forEach(i=>{const e=document.getElementById(i);e&&e.classList.remove('open');}); const b=document.getElementById('panelBackdrop'); if(b)b.classList.remove('on'); }
 const App = {
   saveTimer:null,
   touch(){ if(g('projName')) state.name=g('projName').value;
@@ -1893,11 +1920,11 @@ const App = {
   },
   autosave(){ try{ localStorage.setItem('amazonia_asset_studio', JSON.stringify(serialize())); }catch(e){} },
   restore(){ try{ const raw=localStorage.getItem('amazonia_asset_studio'); if(raw){ deserialize(JSON.parse(raw)); return true; } }catch(e){} return false; },
-  newProject(){ if(!confirm('Comecar um novo asset? O atual sera apagado (use Salvar .json antes).')) return;
+  async newProject(){ if(!await confirmDialog('Começar um novo asset? O atual será apagado (use Salvar .json antes).')) return;
     state=blankState(); uid=1; g('projName').value=state.name; Env.loadInputs(); Scene.rebuild(); UI.refresh(); App.touch(); },
   saveJSON(){ download(safeName()+'.json', JSON.stringify(serialize(),null,2), 'application/json'); },
   openJSON(ev){ const f=ev.target.files[0]; if(!f) return; const r=new FileReader();
-    r.onload=()=>{ try{ deserialize(JSON.parse(r.result)); }catch(e){ alert('JSON invalido: '+e.message); } }; r.readAsText(f); ev.target.value=''; }
+    r.onload=()=>{ try{ deserialize(JSON.parse(r.result)); toast('Asset importado.'); }catch(e){ toast('JSON inválido.'); } }; r.readAsText(f); ev.target.value=''; }
 };
 function serialize(){ if(g('projName')) state.name=g('projName').value; return {v:1, name:state.name, nodes:state.nodes, env:state.env, kf:state.kf}; }
 function deserialize(obj){
@@ -1936,7 +1963,7 @@ const Cloud = {
     catch(e){ Profile.open(); Profile.msg('Erro ao salvar: '+e.message); } },
   async list(){ if(!this.db) return []; const snap=await this.col().orderBy('updatedAt','desc').get(); return snap.docs.map(d=>Object.assign({id:d.id}, d.data())); },
   async open(id){ if(!this.db) return; const doc=await this.col().doc(id).get(); if(!doc.exists) return; deserialize(JSON.parse(doc.data().data)); if(typeof Rig!=='undefined') Rig.render(); Profile.close(); },
-  async del(id){ if(!this.db) return; if(!confirm('Excluir este modelo da nuvem?')) return; await this.col().doc(id).delete(); Profile.refresh(); }
+  async del(id){ if(!this.db) return; if(!await confirmDialog('Excluir este modelo da nuvem?')) return; await this.col().doc(id).delete(); Profile.refresh(); }
 };
 
 const Profile = {
@@ -2032,5 +2059,12 @@ Auth.init();
     var _tries=0; var _sk=setInterval(function(){ _tries++; try{ var g0=document.getElementById('authgate'); if(g0 && getComputedStyle(g0).display!=='none'){ if(window.Auth&&typeof Auth.skip==='function'){ Auth.skip(); } else { g0.style.display='none'; } } else { clearInterval(_sk); } }catch(e){} if(_tries>40) clearInterval(_sk); }, 200); }
 })();
 </script>
+<div id="panelBackdrop" onclick="closePanels()"></div>
+<div id="confirmModal"><div class="auth-card" style="width:380px;max-width:92%">
+  <div class="auth-logo" style="font-size:1.05em">Confirmar</div>
+  <p class="note" id="confirmMsg" style="font-size:13px;color:#dff3e6"></p>
+  <div class="row" style="justify-content:flex-end;gap:8px"><button onclick="_confirmDo(false)">Cancelar</button><button class="primary" onclick="_confirmDo(true)">Confirmar</button></div>
+</div></div>
+<div id="toast"></div>
 </body>
 </html>
