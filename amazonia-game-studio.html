@@ -86,6 +86,12 @@
   #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:22000;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
   #toast .t{background:#12251a;border:1px solid var(--accent);color:#dff3e6;padding:8px 14px;border-radius:10px;box-shadow:0 8px 24px #000a;font-size:13px;opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s;max-width:90vw;text-align:center}
   #toast .t.show{opacity:1;transform:translateY(0)}
+  /* ==== Menus do header ==== */
+  .menu{position:relative}
+  .menu>.menupop{display:none;position:absolute;top:calc(100% + 5px);left:0;z-index:12000;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:6px;min-width:190px;flex-direction:column;gap:4px;box-shadow:0 12px 34px #000c}
+  .menu.open>.menupop{display:flex}
+  .menu>.menupop button{width:100%;justify-content:flex-start;text-align:left}
+  .menubtn{white-space:nowrap}
   /* ==== Paineis (mobile) ==== */
   #panelToggles{display:none;gap:6px}
   #panelBackdrop{display:none}
@@ -327,24 +333,30 @@ if(this.enemies().length===0) this.win();"></textarea>
     <button class="primary" id="btnPlay">▶ Jogar</button>
     <button id="btnStop" class="hide">■ Parar</button>
     <button id="btnGlobal">🌐 Script</button>
-    <button id="btnGen">🎲 Gerar jogo</button>
-    <button id="btnCena">🗺️ Cenário → Jogo</button>
-    <button id="btnCourse">📚 Aula</button>
-    <button id="btnTut">❓ Tutorial</button>
+    <div class="menu"><button class="menubtn" id="mCreate">➕ Criar ▾</button><div class="menupop">
+      <button id="btnGen">🎲 Gerar jogo (por texto)</button>
+      <button id="btnCena">🗺️ Cenário por imagem → Jogo</button>
+      <button id="btnCourse">📚 Aula / exemplos</button>
+    </div></div>
+    <div class="menu"><button class="menubtn" id="mEditors">🛠️ Editores ▾</button><div class="menupop">
+      <button id="btnArt">🎨 Editor de Arte</button>
+      <button id="btn3d">🧊 Editor 3D</button>
+      <button id="btnG3d">🎮 Jogo 3D</button>
+    </div></div>
+    <div class="menu"><button class="menubtn" id="mFile">📄 Arquivo ▾</button><div class="menupop">
+      <button id="btnNew">🆕 Novo projeto</button>
+      <button id="btnOpenJson">📂 Abrir .json</button>
+      <button id="btnExportJson">💾 Exportar .json</button>
+      <button id="btnExportGame">⬇ Exportar jogo (HTML)</button>
+      <button id="btnExportApp">📦 Exportar app</button>
+      <button id="cloudBtn" class="hide">☁ Salvar na nuvem</button>
+      <button id="profileBtn" class="hide">👤 Perfil</button>
+      <button id="logoutBtn" class="hide">🚪 Sair</button>
+    </div></div>
+    <button id="btnTut" title="Tutorial">❓</button>
     <div class="spacer"></div>
     <span id="userBox" class="note hide"></span>
-    <button id="cloudBtn" class="hide">☁ Salvar</button>
-    <button id="profileBtn" class="hide">Perfil</button>
-    <button id="btnArt">🎨 Editor de Arte</button>
-    <button id="btn3d">🧊 Editor 3D</button>
-    <button id="btnG3d">🎮 Jogo 3D</button>
-    <button id="btnNew">Novo</button>
-    <button id="btnExportJson">.json</button>
-    <button id="btnExportGame">⬇ Exportar jogo</button>
-    <button id="btnExportApp">📦 Exportar app</button>
-    <button id="btnOpenJson">Abrir</button>
     <input type="file" id="fileScene" accept=".json" class="hide">
-    <button id="logoutBtn" class="hide">Sair</button>
   </header>
 
   <div class="main">
@@ -879,6 +891,9 @@ function logMsg(m){ const l=g('log'); l.textContent+=(l.textContent?'\n':'')+m; 
 function toast(m){ try{ const w=document.getElementById('toast'); if(!w)return; const d=document.createElement('div'); d.className='t'; d.textContent=m; w.appendChild(d); requestAnimationFrame(()=>d.classList.add('show')); setTimeout(()=>{ d.classList.remove('show'); setTimeout(()=>d.remove(),260); },2600); }catch(e){} }
 function closePanels(){ const l=document.getElementById('sideLeft'),r=document.getElementById('sideRight'),b=document.getElementById('panelBackdrop'); l&&l.classList.remove('open'); r&&r.classList.remove('open'); b&&b.classList.remove('on'); }
 function togglePanel(which){ const el=document.getElementById(which==='left'?'sideLeft':'sideRight'); const ot=document.getElementById(which==='left'?'sideRight':'sideLeft'); if(!el)return; ot&&ot.classList.remove('open'); const op=el.classList.toggle('open'); const b=document.getElementById('panelBackdrop'); if(b)b.classList.toggle('on',op); }
+let _confirmCb=null;
+function confirmDialog(msg){ return new Promise(res=>{ const m=document.getElementById('confirmModal'); if(!m){ res(window.confirm(msg)); return; } document.getElementById('confirmMsg').textContent=msg; m.classList.add('open'); _confirmCb=res; }); }
+function wireMenus(){ const menus=[].slice.call(document.querySelectorAll('.menu')); menus.forEach(m=>{ const b=m.querySelector('.menubtn'); if(b)b.onclick=(e)=>{ e.stopPropagation(); const op=m.classList.contains('open'); menus.forEach(x=>x.classList.remove('open')); if(!op)m.classList.add('open'); }; m.querySelectorAll('.menupop button').forEach(it=>it.addEventListener('click',()=>m.classList.remove('open'))); }); document.addEventListener('click',()=>menus.forEach(x=>x.classList.remove('open'))); }
 function esc(s){ return (''+s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 /* ============ FERRAMENTAS ============ */
@@ -1011,7 +1026,7 @@ function renderScenes(){ const w=g('sceneList'); if(!w)return; w.innerHTML=''; P
     d.onclick=ev=>{ if(ev.target.tagName==='INPUT'||ev.target.tagName==='BUTTON')return; switchScene(i); }; w.appendChild(d); });
   w.querySelectorAll('.snm').forEach(inp=>inp.oninput=()=>{ PR.scenes[+inp.dataset.i].name=inp.value; touch(); });
   w.querySelectorAll('[data-dup]').forEach(b=>b.onclick=()=>dupScene(+b.dataset.dup));
-  w.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ if(PR.scenes.length>1&&confirm('Apagar esta cena?'))delScene(+b.dataset.del); }); }
+  w.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ if(PR.scenes.length>1)confirmDialog('Apagar esta cena?').then(ok=>{ if(ok)delScene(+b.dataset.del); }); }); }
 function syncSceneInputs(){ SND_ON=PR.sound!==false; if(g('soundChk'))g('soundChk').checked=PR.sound!==false; g('projName').value=PR.name; if(g('target'))g('target').value=PR.target||'desktop'; if(g('touchctl'))g('touchctl').value=PR.touchctl||'auto'; if(g('camZoom')){ g('camZoom').value=PR.camZoom||1; g('czVal').textContent=(PR.camZoom||1).toFixed(1); } g('modeSel').value=SC.mode; g('tileSize').value=SC.tile; g('gravity').value=SC.gravity; g('bgColor').value=SC.bg; g('tileColor').value=SC.tileColor; g('gravityRow').style.display=SC.mode==='platformer'?'':'none'; }
 function touch(){ g('saveDot').textContent='salvando...'; clearTimeout(saveT); saveT=setTimeout(()=>{ try{ localStorage.setItem('game_proj',JSON.stringify(serializeProject())); }catch(e){} g('saveDot').textContent='salvo'; pushHistory(); },500); }
 /* ============ EXPORTAR JOGO (HTML jogável) ============ */
@@ -1146,7 +1161,7 @@ function exampleProject(kind){ const hero=makeHero(), coin=makeCoin();
   }
   const scene={name:(kind==='platformer'?'fase plataforma':'fase top-down'),mode:mode,tile:32,gravity:gravity,bg:'#0a0f0c',tileColor:'#3a5d44',grid:grid,layers:[{id:'L1',name:'Cenário',visible:true},{id:'L2',name:'Objetos',visible:true}],active:'L2',entities:entities};
   return {v:2,name:(kind==='platformer'?'modelo-plataforma':'modelo-topdown'),cur:0,target:'desktop',touchctl:'auto',camZoom:1,assets:assets,scenes:[scene]}; }
-function loadCourse(kind){ if(!confirm('Carregar o projeto-modelo? O projeto atual fica salvo localmente até você salvar de novo.')) return; loadProject(exampleProject(kind)); g('courseModal').classList.remove('open'); touch(); logMsg('📚 Projeto-modelo "'+kind+'" carregado! Clique em ▶ Jogar para testar. Estude os Comportamentos de cada objeto no Inspetor.'); }
+async function loadCourse(kind){ if(!await confirmDialog('Carregar o projeto-modelo? O projeto atual fica salvo localmente até você salvar de novo.')) return; loadProject(exampleProject(kind)); g('courseModal').classList.remove('open'); touch(); logMsg('📚 Projeto-modelo "'+kind+'" carregado! Clique em ▶ Jogar para testar. Estude os Comportamentos de cada objeto no Inspetor.'); }
 
 /* ============ EDITOR DE ARTE (módulo) ============ */
 function openArtEditor(){ const f=g('artFrame'); if(!f.getAttribute('src')) f.setAttribute('src','amazonia-pixel-studio.html'); g('artEditor').style.display='flex'; }
@@ -1293,8 +1308,8 @@ function genGameFromText(desc){ const t=(desc||'').toLowerCase(); const rnd=(a,b
   const scene={name:'fase 1',mode:mode,tile:T,gravity:mode==='platformer'?1800:0,bg:bg,tileColor:tile,grid:grid,layers:[{id:'L1',name:'Cenário',visible:true},{id:'L2',name:'Objetos',visible:true}],active:'L2',entities:ents};
   let name=(desc||'jogo gerado').slice(0,30).replace(/[^0-9a-zà-ú \-]/gi,'').trim()||'jogo gerado';
   return {v:2,name:name,cur:0,target:'desktop',touchctl:'auto',camZoom:1,sound:true,assets:assets,scenes:[scene]}; }
-function gerarJogo(){ const d=(g('genIn').value||'').trim(); if(!d){ g('genOut').textContent='Descreva seu jogo (ex: plataforma na floresta com inimigos e moedas).'; return; }
-  if(!confirm('Gerar um jogo novo a partir da ideia? O projeto atual fica salvo localmente até salvar de novo.')) return;
+async function gerarJogo(){ const d=(g('genIn').value||'').trim(); if(!d){ g('genOut').textContent='Descreva seu jogo (ex: plataforma na floresta com inimigos e moedas).'; return; }
+  if(!await confirmDialog('Gerar um jogo novo a partir da ideia? O projeto atual fica salvo localmente até salvar de novo.')) return;
   loadProject(genGameFromText(d)); g('genModal').classList.remove('open'); touch(); logMsg('🎲 Jogo gerado! Clique em ▶ Jogar. Gere de novo para variar.'); }
 
 function makeBullet(){ const w=6,h=6,a=new Array(w*h).fill(''); for(let y=0;y<h;y++)for(let x=0;x<w;x++){ const dx=x-2.5,dy=y-2.5,d=dx*dx+dy*dy; if(d<=5) a[y*w+x]=(d<=1?'#fff3b0':'#ffd23f'); } return {w:w,h:h,clips:{idle:[a]}}; }
@@ -1406,7 +1421,7 @@ function imgUrlToPixelRaw(url,MAX){ return new Promise(function(resolve){ const 
 function cenaGenSprite(prompt,fallback,max){ return new Promise(function(resolve){ const url='https://image.pollinations.ai/prompt/'+encodeURIComponent(prompt)+'?width=128&height=128&nologo=true&seed='+Math.floor(Math.random()*99999); imgUrlToPixelRaw(url,max||32).then(function(raw){ resolve(raw||fallback()); }).catch(function(){ resolve(fallback()); }); }); }
 function cenaModeFromText(t){ t=(t||'').toLowerCase(); if(/top-?down|de cima|visto de cima|vista superior|masmorra|labirinto|zelda|dungeon|aerea|aérea|top view|top-view/.test(t))return 'topdown'; if(/plataforma|lateral|side-?scroll|side scroller|corredor lateral|jump/.test(t))return 'platformer'; return ''; }
 async function cenaGenerate(){ if(!Cena.img){ g('cenaOut').textContent='Escolha uma imagem primeiro.'; return; } if(!Cena.boxes.length){ cenaAutoDetect(); }
-  if(!confirm('A IA vai analisar a imagem, criar SPRITES NOVOS a partir da descrição e montar o jogo. O projeto atual fica salvo localmente até você salvar de novo.')) return;
+  if(!await confirmDialog('A IA vai analisar a imagem, criar SPRITES NOVOS a partir da descrição e montar o jogo. O projeto atual fica salvo localmente até você salvar de novo.')) return;
   const A=Cena.analysis||cenaAnalyze(false); let descText=(g('cenaDesc')&&g('cenaDesc').value.trim())||'';
   if(!Cena.descEdited){ g('cenaOut').textContent='🔎 A IA está olhando a imagem…'; try{ const v=await cenaVisionDescribe(); if(v){ descText=v; if(g('cenaDesc'))g('cenaDesc').value=v; } }catch(e){} }
   if(!descText) descText=A.desc||'';
@@ -1483,7 +1498,7 @@ function wire(){ buildTools(); setTool('select');
   g('artsLocalBtn').onclick=()=>{ try{ const r=localStorage.getItem('px_proj'); if(!r){logMsg('Nada encontrado do Pixel Studio neste navegador.');return;} importArt(projFromAny(JSON.parse(r)),'pixel-studio'); }catch(e){ logMsg('Erro ao ler local: '+e.message); } };
   g('artsFileBtn').onclick=()=>g('fileArt').click();
   g('fileArt').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{ importArt(projFromAny(JSON.parse(r.result)), f.name.replace(/\.json$/,'')); }catch(x){ logMsg('JSON inválido.'); } }; r.readAsText(f); e.target.value=''; };
-  g('btnNew').onclick=()=>{ if(confirm('Começar um projeto novo? (o atual fica salvo localmente)')){ loadProject(newProject()); touch(); } };
+  g('btnNew').onclick=()=>{ confirmDialog('Começar um projeto novo? (o atual fica salvo localmente)').then(ok=>{ if(ok){ loadProject(newProject()); touch(); } }); };
   g('btnExportJson').onclick=()=>{ const blob=new Blob([JSON.stringify(serializeProject())],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(PR.name||'projeto')+'.json'; a.click(); };
   g('btnOpenJson').onclick=()=>g('fileScene').click();
   g('fileScene').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{ loadProject(JSON.parse(r.result)); logMsg('Projeto carregado.'); }catch(x){ logMsg('JSON inválido.'); } }; r.readAsText(f); e.target.value=''; };
@@ -1538,6 +1553,9 @@ function wire(){ buildTools(); setTool('select');
   if(g('tglLeft'))g('tglLeft').onclick=()=>togglePanel('left');
   if(g('tglRight'))g('tglRight').onclick=()=>togglePanel('right');
   if(g('panelBackdrop'))g('panelBackdrop').onclick=closePanels;
+  wireMenus();
+  if(g('confirmYes'))g('confirmYes').onclick=()=>{ g('confirmModal').classList.remove('open'); if(_confirmCb){_confirmCb(true);_confirmCb=null;} };
+  if(g('confirmNo'))g('confirmNo').onclick=()=>{ g('confirmModal').classList.remove('open'); if(_confirmCb){_confirmCb(false);_confirmCb=null;} };
   const _wflag=()=>{ try{localStorage.setItem('gs_welcomed','1');}catch(e){} };
   if(g('welcomeStart'))g('welcomeStart').onclick=()=>{ g('welcomeModal').classList.remove('open'); _wflag(); };
   if(g('welcomeTut'))g('welcomeTut').onclick=()=>{ g('welcomeModal').classList.remove('open'); _wflag(); g('tutModal').classList.add('open'); };
@@ -1564,6 +1582,13 @@ boot();
 </script>
 <div id="panelBackdrop"></div>
 <div id="toast"></div>
+<div id="confirmModal" class="modal">
+  <div class="auth-card" style="width:400px;max-width:92%">
+    <div class="auth-logo" style="font-size:1.05em">Confirmar</div>
+    <p class="note" id="confirmMsg" style="font-size:13px;color:#dff3e6"></p>
+    <div class="row" style="justify-content:flex-end;gap:8px;margin-top:4px"><button id="confirmNo">Cancelar</button><button class="primary" id="confirmYes">Confirmar</button></div>
+  </div>
+</div>
 <div id="welcomeModal" class="modal">
   <div class="auth-card" style="width:460px;max-width:94%">
     <div class="auth-logo" style="font-size:1.2em">👋 Bem-vindo ao Game Studio</div>
