@@ -1056,11 +1056,15 @@ if(SCENE.touchctl==='on'||(SCENE.touchctl!=='off'&&('ontouchstart' in window||na
 RUN.raf=requestAnimationFrame(loop);
 `.replace('__SCENE__', JSON.stringify(scene));
   const op='<scr'+'ipt>'; const cl='<\/scr'+'ipt>';
+  const errSrc='(function(){function showErr(msg){try{var d=document.getElementById("__experr");if(!d){d=document.createElement("div");d.id="__experr";d.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#3a1414;color:#ffd7d7;font:13px/1.4 system-ui;padding:10px 14px;border-top:2px solid #ff6b6b;white-space:pre-wrap;max-height:40%;overflow:auto";document.body.appendChild(d);}d.textContent="\\u26a0 Erro no jogo: "+msg;}catch(e){}try{if(parent&&parent!==window)parent.postMessage({__exp_err:String(msg)},"*");}catch(e){}}window.addEventListener("error",function(e){showErr((e&&e.message)||"erro");});window.addEventListener("unhandledrejection",function(e){showErr("promise: "+((e&&e.reason&&e.reason.message)||e.reason||""));});})();';
   return '<!DOCTYPE html>\n<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(scene.name||'jogo')+'</title>'+
     '<style>html,body{margin:0;height:100%;background:'+scene.bg+';overflow:hidden}#game{display:block;width:100vw;height:100vh;image-rendering:pixelated}.hud{position:fixed;left:8px;bottom:8px;color:#9fb;font:12px system-ui;opacity:.55;pointer-events:none}</style></head>'+
     '<body><canvas id="game"></canvas><div class="hud">Setas/WASD mover • Espaço/↑ pular • J ação</div>'+
+    op+errSrc+cl+
     op+'\n'+inputSrc+'\n'+behSrc+'\n'+fnSrc+'\n'+boot+'\n'+cl+'</body></html>';
 }
+
+function exportSmokeTest(html){ return new Promise(res=>{ let done=false,err=null; const ifr=document.createElement('iframe'); ifr.style.cssText='position:fixed;left:-10000px;top:-10000px;width:800px;height:450px;visibility:hidden'; const onmsg=e=>{ if(e&&e.data&&e.data.__exp_err&&!err)err=e.data.__exp_err; }; window.addEventListener('message',onmsg); const finish=()=>{ if(done)return; done=true; window.removeEventListener('message',onmsg); try{document.body.removeChild(ifr);}catch(e){} res(err); }; document.body.appendChild(ifr); try{ ifr.srcdoc=html; }catch(e){ finish(); } setTimeout(finish,1500); }); }
 
 /* ============ IMPORTAR ARTES ============ */
 function projFromAny(d){ const p=d&&(d.data||d.proj||d); if(p&&(p.frames||p.clips))return p; return null; }
@@ -1519,7 +1523,7 @@ function wire(){ buildTools(); setTool('select');
   })();
   window.addEventListener('resize',resize);
   document.querySelectorAll('.side .card>h3').forEach(h=>{ h.title='clique para recolher/expandir'; h.onclick=()=>h.parentElement.classList.toggle('collapsed'); });
-  g('btnExportGame').onclick=()=>{ try{ const html=buildExportHTML(); const b=new Blob([html],{type:'text/html'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=(SC.name||'jogo')+'-jogo.html'; a.click(); logMsg('Jogo exportado como HTML jogável (abra o arquivo baixado).'); }catch(err){ logMsg('Erro ao exportar: '+err.message); } };
+  g('btnExportGame').onclick=async ()=>{ try{ const html=buildExportHTML(); toast('Testando o jogo exportado…'); const err=await exportSmokeTest(html); if(err){ const ok=await confirmDialog('O teste do jogo exportado apontou um erro:\n\n'+err+'\n\nQuer baixar mesmo assim?'); if(!ok){ logMsg('Exportação cancelada (erro no teste): '+err); toast('Exportação cancelada.'); return; } } const b=new Blob([html],{type:'text/html'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=(SC.name||'jogo')+'-jogo.html'; a.click(); logMsg('Jogo exportado como HTML jogável (abra o arquivo baixado).'); toast('Jogo exportado'+(err?' (com aviso)':'!')); }catch(err){ logMsg('Erro ao exportar: '+err.message); toast('Erro ao exportar: '+err.message); } };
   g('btnExportApp').onclick=()=>{ try{ buildAppZip(); }catch(err){ logMsg('Erro ao exportar app: '+err.message); } };
   g('addScene').onclick=()=>addScene();
   g('target').onchange=e=>{ PR.target=e.target.value; draw(); touch(); };
