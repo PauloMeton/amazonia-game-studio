@@ -18,6 +18,17 @@
   .sep{width:1px;height:22px;background:var(--line);margin:0 3px}
   #hint{position:fixed;bottom:8px;left:8px;z-index:50;font-size:12px;color:var(--muted);background:rgba(0,0,0,.4);padding:5px 9px;border-radius:6px}
   a-scene{position:fixed;inset:0}
+  #toast3{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:22000;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+  #toast3 .t{background:#12251a;border:1px solid var(--accent);color:#dff3e6;padding:7px 13px;border-radius:9px;font-size:13px;opacity:0;transform:translateY(8px);transition:.2s;max-width:90vw;text-align:center}
+  #toast3 .t.show{opacity:1;transform:none}
+  #cf3{display:none;position:fixed;inset:0;z-index:21000;background:rgba(0,0,0,.6);align-items:center;justify-content:center}
+  #cf3 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;width:340px;max-width:92%}
+  #cf3 .b{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+  #g3hud{display:none;position:fixed;top:8px;left:8px;z-index:55;color:#dff3e6;font-size:18px;text-shadow:0 1px 3px #000}
+  #g3flash{position:fixed;inset:0;z-index:54;background:#ff2b2b;opacity:0;pointer-events:none;transition:opacity .12s}
+  #g3over{display:none;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.72);flex-direction:column;align-items:center;justify-content:center}
+  #g3over.show{display:flex}
+  #g3over h1{color:#fff;font-size:36px;margin:0 0 12px}
 </style>
 </head>
 <body>
@@ -30,6 +41,9 @@
   <button class="kind" data-k="parede">Parede</button>
   <button class="kind" data-k="esfera">Esfera</button>
   <button class="kind" data-k="cilindro">Cilindro</button>
+  <button class="kind" data-k="inimigo" title="Persegue o player">Inimigo</button>
+  <button class="kind" data-k="moeda" title="Colete para vencer">Moeda</button>
+  <button class="kind" data-k="saida" title="Chegue aqui para vencer">Saída</button>
   <input type="color" id="col" value="#8a5a34">
   <button id="del" class="danger" style="border-color:#5a2b2b;color:var(--danger)">🗑 Apagar</button>
   <span class="sep"></span>
@@ -38,9 +52,15 @@
   <button id="stop" style="display:none">■ Parar</button>
   <span class="sep"></span>
   <button id="rotL">⟲</button><button id="rotR">⟳</button><button id="zin">+</button><button id="zout">−</button>
-  <button id="save">💾</button><button id="open">📂</button><input type="file" id="file" accept=".json" style="display:none"><button id="novo">Novo</button>
+  <button id="save">💾</button><button id="open">📂</button><input type="file" id="file" accept=".json" style="display:none"><button id="export" title="Baixar jogo jogável">⬇ Exportar</button><button id="novo">Novo</button>
 </div>
 <div id="hint">Coloque blocos clicando no chão (ou em cima de outro pra empilhar). 📍 marca onde o player nasce. ▶ Jogar: WASD anda, mouse olha, Espaço pula, Esc/Parar volta.</div>
+
+<div id="g3hud"></div>
+<div id="g3flash"></div>
+<div id="g3over"><h1 id="g3overt"></h1><button id="g3restart" class="primary" style="font-size:16px;padding:10px 20px">↻ Jogar de novo</button></div>
+<div id="cf3"><div class="card"><div id="cf3msg" style="font-size:13px;color:#dff3e6"></div><div class="b"><button onclick="_cfDo(false)">Cancelar</button><button class="primary" onclick="_cfDo(true)">Confirmar</button></div></div></div>
+<div id="toast3"></div>
 
 <a-scene id="scene" cursor="rayOrigin: mouse" raycaster="objects: .ray; far: 300" vr-mode-ui="enabled: false" background="color: #0a0f0c">
   <a-light type="ambient" color="#8899aa" intensity="0.7"></a-light>
@@ -55,51 +75,51 @@
 <script>
 const $=id=>document.getElementById(id);
 const scene=$('scene'), world=$('world'), rig=$('rig'), cam=$('cam'), ground=$('ground'), marker=$('marker');
-let tool='place', kind='cubo', color='#8a5a34', sel=null, playing=false, start={x:0,z:0}, idc=0;
+let tool='place', kind='cubo', color='#8a5a34', sel=null, playing=false, start={x:0,z:0}, idc=0, _playSnap=null;
 
-/* grade no chão */
+/* toast + confirm */
+let _cf=null;
+function confirmDialog(msg){ return new Promise(res=>{ const m=$('cf3'); if(!m){res(window.confirm(msg));return;} $('cf3msg').textContent=msg; m.style.display='flex'; _cf=res; }); }
+function _cfDo(v){ const m=$('cf3'); if(m)m.style.display='none'; if(_cf){_cf(v);_cf=null;} }
+function toast(m){ try{ const w=$('toast3'); if(!w)return; const d=document.createElement('div'); d.className='t'; d.textContent=m; w.appendChild(d); requestAnimationFrame(()=>d.classList.add('show')); setTimeout(()=>{ d.classList.remove('show'); setTimeout(()=>d.remove(),260); },2400);}catch(e){} }
+
 function gridTex(){ const c=document.createElement('canvas'); c.width=c.height=64; const x=c.getContext('2d'); x.fillStyle='#2e7d32'; x.fillRect(0,0,64,64); x.strokeStyle='rgba(0,0,0,.25)'; x.lineWidth=2; x.strokeRect(0,0,64,64); return c.toDataURL(); }
 
-/* colocar objeto numa célula */
-function makeObj(o){ const e=document.createElement('a-entity'); e.classList.add('ray','editable','solid'); e._d={x:o.x,y:o.y,z:o.z,type:o.type,color:o.color}; idc++; e.id='o'+idc;
-  let g;
-  if(o.type==='parede'){ g='primitive: box; height: 2; width: 1; depth: 1'; e.setAttribute('position', o.x+' '+(o.y+0.5)+' '+o.z); e._d.tall=true; }
-  else if(o.type==='esfera'){ g='primitive: sphere; radius: 0.5'; e.setAttribute('position', o.x+' '+o.y+' '+o.z); }
-  else if(o.type==='cilindro'){ g='primitive: cylinder; radius: 0.5; height: 1'; e.setAttribute('position', o.x+' '+o.y+' '+o.z); }
-  else { g='primitive: box; height: 1; width: 1; depth: 1'; e.setAttribute('position', o.x+' '+o.y+' '+o.z); }
-  e.setAttribute('geometry', g); e.setAttribute('material','color: '+o.color);
-  world.appendChild(e); return e; }
+function makeObj(o){ const e=document.createElement('a-entity'); e._d={x:o.x,y:o.y,z:o.z,type:o.type,color:o.color}; idc++; e.id='o'+idc;
+  let g, py=o.y, mat='color: '+(o.color||'#8a5a34'), cls='ray editable', rot=null;
+  if(o.type==='parede'){ g='primitive: box; height: 2; width: 1; depth: 1'; py=o.y+0.5; e._d.tall=true; cls+=' solid'; }
+  else if(o.type==='esfera'){ g='primitive: sphere; radius: 0.5'; cls+=' solid'; }
+  else if(o.type==='cilindro'){ g='primitive: cylinder; radius: 0.5; height: 1'; cls+=' solid'; }
+  else if(o.type==='inimigo'){ g='primitive: box; height: 1.2; width: 0.7; depth: 0.7'; py=o.y+0.1; mat='color: '+(o.color||'#e74c3c')+'; emissive: #3a0f0f; emissiveIntensity: 0.45'; cls+=' enemy'; }
+  else if(o.type==='moeda'){ g='primitive: torus; radius: 0.32; radius-tubular: 0.12'; py=o.y+0.3; rot='90 0 0'; mat='color: '+(o.color||'#f1c40f')+'; emissive:#5a4a00; emissiveIntensity:0.35'; cls+=' coin'; }
+  else if(o.type==='saida'){ g='primitive: torus; radius: 0.7; radius-tubular: 0.13'; py=o.y+0.7; mat='color: '+(o.color||'#7FFFD4')+'; emissive:#0a5a3a; emissiveIntensity:0.5'; cls+=' exit'; }
+  else { g='primitive: box; height: 1; width: 1; depth: 1'; cls+=' solid'; }
+  e.setAttribute('geometry', g); e.setAttribute('position', o.x+' '+py+' '+o.z); e.setAttribute('material', mat); if(rot)e.setAttribute('rotation',rot); e.className=cls; world.appendChild(e); return e; }
 
-function place(p){ const gx=Math.floor(p.x)+0.5, gz=Math.floor(p.z)+0.5; const gy=Math.round(p.y-0.5)+0.5+ (p.y>0.6?1:0);
-  // empilhar: se clicou em cima de um objeto, sobe um nível
-  let cy=0.5; const cell=Math.round(p.y); if(cell>=1) cy=cell+0.5;
-  makeObj({x:gx,y:cy,z:gz,type:kind,color:color}); save(); }
+function place(p){ const gx=Math.floor(p.x)+0.5, gz=Math.floor(p.z)+0.5; let cy=0.5; const cell=Math.round(p.y); if(cell>=1) cy=cell+0.5; makeObj({x:gx,y:cy,z:gz,type:kind,color:color}); save(); }
 
-function selectEl(e){ if(sel){ sel.setAttribute('material','color: '+sel._d.color); } sel=e; if(e) e.setAttribute('material','color: #D4AF37; emissive: #553; '); }
+function selectEl(e){ if(sel){ sel.setAttribute('material','color: '+sel._d.color); } sel=e; if(e) e.setAttribute('material','color: #D4AF37; emissive: #553;'); }
 
-/* clique na cena */
 scene.addEventListener('click', ev=>{ if(playing) return; const it=ev.detail.intersection; if(!it) return; const o=ev.detail.intersectedEl;
   if(tool==='select'){ if(o&&o.classList.contains('editable')) selectEl(o); else selectEl(null); return; }
   if(tool==='setstart'){ start={x:Math.floor(it.point.x)+0.5,z:Math.floor(it.point.z)+0.5}; marker.setAttribute('position', start.x+' 0.05 '+start.z); marker.setAttribute('visible','true'); tool='place'; setTool('place'); save(); return; }
   place(it.point); });
 
-/* câmera orbital */
 $('rotL').onclick=()=>{ rig.object3D.rotation.y+=0.25; };
 $('rotR').onclick=()=>{ rig.object3D.rotation.y-=0.25; };
 $('zin').onclick=()=>{ const p=cam.object3D.position; p.multiplyScalar(0.88); };
 $('zout').onclick=()=>{ const p=cam.object3D.position; p.multiplyScalar(1.14); };
 
-/* ferramentas */
 function setTool(t){ tool=t; $('tPlace').classList.toggle('on',t==='place'); $('tSelect').classList.toggle('on',t==='select'); }
 $('tPlace').onclick=()=>setTool('place'); $('tSelect').onclick=()=>setTool('select');
-$('setStart').onclick=()=>{ tool='setstart'; $('tPlace').classList.remove('on'); $('tSelect').classList.remove('on'); };
+$('setStart').onclick=()=>{ tool='setstart'; $('tPlace').classList.remove('on'); $('tSelect').classList.remove('on'); toast('Clique no chão para marcar onde o player nasce.'); };
 document.querySelectorAll('.kind').forEach(b=>b.onclick=()=>{ kind=b.dataset.k; document.querySelectorAll('.kind').forEach(x=>x.classList.toggle('on',x===b)); setTool('place'); });
 $('col').oninput=e=>{ color=e.target.value; if(sel){ sel._d.color=color; sel.setAttribute('material','color: '+color); save(); } };
 $('del').onclick=()=>{ if(sel){ sel.parentNode.removeChild(sel); sel=null; save(); } };
 document.addEventListener('keydown',e=>{ if(playing){ if(e.code==='Escape')stopPlay(); return; } if(e.key==='Delete'&&sel){ sel.parentNode.removeChild(sel); sel=null; save(); } });
 
-/* jogar (1ª pessoa) */
-AFRAME.registerComponent('fpsmove',{
+/* movimento 1a pessoa */
+const FPSMOVE={
   init(){ this.keys={}; this.vy=0; this.onG=false; this.kd=e=>this.keys[e.code]=true; this.ku=e=>this.keys[e.code]=false; window.addEventListener('keydown',this.kd); window.addEventListener('keyup',this.ku); },
   remove(){ window.removeEventListener('keydown',this.kd); window.removeEventListener('keyup',this.ku); },
   tick(t,dtms){ const dt=Math.min(0.05,(dtms||16)/1000); const o=this.el.object3D.position; const k=this.keys;
@@ -116,25 +136,69 @@ AFRAME.registerComponent('fpsmove',{
       else { if(Math.abs(o.x-p.x)<0.5+r&&Math.abs(o.z-p.z)<0.5+r){ o.z = dv>0? p.z-0.5-r : p.z+0.5+r; } } } },
   collV(o){ const r=0.35; this.onG=false; if(o.y<1.6){ o.y=1.6; this.vy=0; this.onG=true; }
     for(const el of this.boxes()){ const p=el.object3D.position; const hh=el._d&&el._d.tall?1:0.5; if(Math.abs(o.x-p.x)<0.5+r&&Math.abs(o.z-p.z)<0.5+r){ const top=p.y+hh+1.6; if(this.vy<=0&&o.y<=top+0.05&&o.y>top-0.7){ o.y=top; this.vy=0; this.onG=true; } } } }
-});
+};
+AFRAME.registerComponent('fpsmove',FPSMOVE);
+
+/* regras do jogo: inimigos, moedas, saida, vida */
+const GAMEPLAY={
+  init(){ this.hp=3; this.coins=0; this.total=document.querySelectorAll('#world .coin').length; this.over=false; this.cd=0; this.msg=''; this.msgT=0; this.updHud(); const o=document.getElementById('g3over'); if(o)o.classList.remove('show'); },
+  updHud(){ const h=document.getElementById('g3hud'); if(!h)return; let s=''; for(let i=0;i<this.hp;i++)s+='❤'; if(this.hp<=0)s='💀'; h.textContent=s+'   🪙 '+this.coins+(this.total?('/'+this.total):'')+(this.msg?('   '+this.msg):''); },
+  flash(){ const f=document.getElementById('g3flash'); if(!f)return; f.style.opacity='0.5'; setTimeout(function(){ f.style.opacity='0'; },120); },
+  end(txt){ this.over=true; const o=document.getElementById('g3over'), t=document.getElementById('g3overt'); if(t)t.textContent=txt; if(o)o.classList.add('show'); if(document.exitPointerLock)document.exitPointerLock(); },
+  tick(t,dtms){ if(this.over)return; const dt=Math.min(0.05,(dtms||16)/1000); const pl=window._pl; if(!pl)return; const pp=pl.object3D.position; const self=this;
+    if(this.cd>0)this.cd-=dt; if(this.msgT>0){ this.msgT-=dt; if(this.msgT<=0){ this.msg=''; this.updHud(); } }
+    document.querySelectorAll('#world .enemy').forEach(function(en){ const ep=en.object3D.position; const dx=pp.x-ep.x, dz=pp.z-ep.z; const d=Math.hypot(dx,dz)||1; if(d>0.8){ ep.x+=dx/d*2.2*dt; ep.z+=dz/d*2.2*dt; } en.object3D.rotation.y=Math.atan2(dx,dz);
+      if(d<1.0 && self.cd<=0){ self.hp--; self.cd=1.1; self.flash(); self.updHud(); if(self.hp<=0)self.end('FIM DE JOGO'); } });
+    document.querySelectorAll('#world .coin').forEach(function(c){ c.object3D.rotation.z+=dt*3; const cp=c.object3D.position; if(Math.hypot(pp.x-cp.x,pp.z-cp.z)<1.0 && Math.abs(pp.y-cp.y)<2.2){ c.parentNode.removeChild(c); self.coins++; self.updHud(); } });
+    const ex=document.querySelector('#world .exit'); if(ex){ ex.object3D.rotation.y+=dt*1.5; const xp=ex.object3D.position; if(Math.hypot(pp.x-xp.x,pp.z-xp.z)<1.3){ if(self.total===0||self.coins>=self.total){ self.end('VOCÊ VENCEU!'); } else { self.msg='Pegue as moedas ('+self.coins+'/'+self.total+')'; self.msgT=1.5; self.updHud(); } } }
+  }
+};
+AFRAME.registerComponent('gameplay',GAMEPLAY);
+
 function startPlay(){ if(playing)return; playing=true; $('play').style.display='none'; $('stop').style.display='';
-  cam.setAttribute('camera','active:false');
+  _playSnap=serialize(); cam.setAttribute('camera','active:false');
   const pl=document.createElement('a-entity'); pl.id='player'; pl.setAttribute('position', start.x+' 1.6 '+start.z);
   const c=document.createElement('a-entity'); c.setAttribute('camera','active: true'); c.setAttribute('look-controls','pointerLockEnabled: true'); pl.appendChild(c);
-  pl.setAttribute('fpsmove',''); scene.appendChild(pl); window._pl=pl; }
+  pl.setAttribute('fpsmove',''); pl.setAttribute('gameplay',''); scene.appendChild(pl); window._pl=pl;
+  $('g3hud').style.display='block'; }
 function stopPlay(){ if(!playing)return; playing=false; $('play').style.display=''; $('stop').style.display='none';
-  if(window._pl){ window._pl.parentNode.removeChild(window._pl); window._pl=null; } cam.setAttribute('camera','active: true'); if(document.exitPointerLock)document.exitPointerLock(); }
+  if(window._pl){ window._pl.parentNode.removeChild(window._pl); window._pl=null; } cam.setAttribute('camera','active: true'); if(document.exitPointerLock)document.exitPointerLock();
+  $('g3hud').style.display='none'; const ov=$('g3over'); if(ov)ov.classList.remove('show');
+  if(_playSnap){ load(_playSnap); _playSnap=null; } }
 $('play').onclick=startPlay; $('stop').onclick=stopPlay;
+$('g3restart').onclick=()=>{ stopPlay(); setTimeout(startPlay,60); };
 
 /* salvar / carregar */
 function serialize(){ const objs=Array.from(world.children).map(e=>e._d); return {v:1,objects:objs,start:start}; }
 function clearWorld(){ while(world.firstChild)world.removeChild(world.firstChild); sel=null; }
 function load(o){ clearWorld(); (o.objects||[]).forEach(d=>makeObj(d)); start=o.start||{x:0,z:0}; marker.setAttribute('position',start.x+' 0.05 '+start.z); marker.setAttribute('visible','true'); }
 function save(){ try{ localStorage.setItem('a3d_proj',JSON.stringify(serialize())); }catch(e){} }
-$('save').onclick=()=>{ const b=new Blob([JSON.stringify(serialize())],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='jogo-3d.json'; a.click(); };
+$('save').onclick=()=>{ const b=new Blob([JSON.stringify(serialize())],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='jogo-3d.json'; a.click(); toast('Projeto salvo (.json).'); };
 $('open').onclick=()=>$('file').click();
-$('file').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{ load(JSON.parse(r.result)); save(); }catch(x){ alert('JSON inválido'); } }; r.readAsText(f); e.target.value=''; };
-$('novo').onclick=()=>{ if(confirm('Começar do zero?')){ clearWorld(); start={x:0,z:0}; save(); } };
+$('file').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{ load(JSON.parse(r.result)); save(); toast('Projeto carregado.'); }catch(x){ toast('JSON inválido.'); } }; r.readAsText(f); e.target.value=''; };
+$('novo').onclick=()=>{ confirmDialog('Começar do zero? O projeto atual será apagado.').then(ok=>{ if(ok){ clearWorld(); start={x:0,z:0}; save(); toast('Novo projeto.'); } }); };
+
+/* exportar jogo 3D standalone */
+function objSrc(o){ return '{'+Object.keys(o).map(function(k){ return o[k].toString(); }).join(',\n')+'}'; }
+function buildExport3D(){
+  const data=JSON.stringify(serialize());
+  const op='<scr'+'ipt>', cl='<\/scr'+'ipt>';
+  const errS2='(function(){function s(m){try{var d=document.getElementById("__e");if(!d){d=document.createElement("div");d.id="__e";d.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#3a1414;color:#ffd7d7;font:13px system-ui;padding:10px;white-space:pre-wrap";document.body.appendChild(d);}d.textContent="\\u26a0 Erro no jogo: "+m;}catch(e){}}window.addEventListener("error",function(e){s((e&&e.message)||"erro")});})();';
+  const runtime='let idc=0; const world=document.querySelector("#world"), scene=document.querySelector("#scene"), ground=document.querySelector("#ground");\n'
+    + gridTex.toString()+'\n'
+    + makeObj.toString()+'\n'
+    + 'AFRAME.registerComponent("fpsmove",'+objSrc(FPSMOVE)+');\n'
+    + 'AFRAME.registerComponent("gameplay",'+objSrc(GAMEPLAY)+');\n'
+    + 'window.addEventListener("keydown",function(e){ if(e.code==="KeyR") location.reload(); });\n'
+    + 'function boot(){ ground.setAttribute("material",{src:gridTex(),repeat:"120 120",color:"#2e7d32",side:"double"}); (DATA.objects||[]).forEach(function(d){makeObj(d);}); var st=DATA.start||{x:0,z:0}; var pl=document.createElement("a-entity"); pl.id="player"; pl.setAttribute("position",st.x+" 1.6 "+st.z); var c=document.createElement("a-entity"); c.setAttribute("camera","active: true"); c.setAttribute("look-controls","pointerLockEnabled: true"); pl.appendChild(c); pl.setAttribute("fpsmove",""); pl.setAttribute("gameplay",""); scene.appendChild(pl); window._pl=pl; document.getElementById("g3hud").style.display="block"; }\n'
+    + 'if(scene.hasLoaded)boot(); else scene.addEventListener("loaded",boot);';
+  const sceneHTML='<a-scene id="scene" vr-mode-ui="enabled: false" background="color: #0a0f0c"><a-light type="ambient" color="#8899aa" intensity="0.7"></a-light><a-light type="directional" position="4 10 6" intensity="0.8"></a-light><a-sky color="#0a141c"></a-sky><a-plane id="ground" class="ray" rotation="-90 0 0" width="120" height="120" position="0 0 0" material="color: #2e7d32; side: double"></a-plane><a-entity id="world"></a-entity></a-scene>';
+  return '<!DOCTYPE html>\n<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Jogo 3D</title>'
+    +'<scr'+'ipt src="https://aframe.io/releases/1.5.0/aframe.min.js"><\/scr'+'ipt>'
+    +'<style>html,body{margin:0;height:100%;overflow:hidden;background:#0a0f0c;font-family:system-ui}#g3hud{display:none;position:fixed;top:8px;left:8px;z-index:55;color:#dff3e6;font-size:18px;text-shadow:0 1px 3px #000}#g3flash{position:fixed;inset:0;z-index:54;background:#ff2b2b;opacity:0;pointer-events:none;transition:opacity .12s}#g3over{display:none;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.72);flex-direction:column;align-items:center;justify-content:center}#g3over.show{display:flex}#g3over h1{color:#fff;font-size:36px;margin:0 0 12px}#g3over button{font-size:16px;padding:10px 20px;border-radius:8px;border:1px solid #7FFFD4;background:#1f4a35;color:#7FFFD4;cursor:pointer}#hint{position:fixed;bottom:8px;left:8px;z-index:50;color:#8fb89c;font-size:12px;background:rgba(0,0,0,.4);padding:5px 9px;border-radius:6px}</style></head>'
+    +'<body><div id="g3hud"></div><div id="g3flash"></div><div id="hint">WASD anda • mouse olha • Espaço pula • clique para travar o mouse • R reinicia</div><div id="g3over"><h1 id="g3overt"></h1><button onclick="location.reload()">↻ Jogar de novo</button></div>'
+    + sceneHTML + op+errS2+cl + op+'const DATA='+data+';\n'+runtime+cl + '</body></html>'; }
+$('export').onclick=()=>{ try{ const html=buildExport3D(); const b=new Blob([html],{type:'text/html'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='jogo-3d.html'; a.click(); toast('Jogo 3D exportado!'); }catch(e){ toast('Erro ao exportar: '+e.message); } };
 
 /* boot */
 function boot(){ ground.setAttribute('material',{src:gridTex(), repeat:'120 120', color:'#2e7d32', side:'double'});
