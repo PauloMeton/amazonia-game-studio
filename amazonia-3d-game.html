@@ -26,6 +26,7 @@
   #cf3 .b{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
   #g3hud{display:none;position:fixed;top:8px;left:8px;z-index:55;color:#dff3e6;font-size:18px;text-shadow:0 1px 3px #000}
   #g3flash{position:fixed;inset:0;z-index:54;background:#ff2b2b;opacity:0;pointer-events:none;transition:opacity .12s}
+  #g3cross{display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:56;color:#fff;font-size:22px;text-shadow:0 0 4px #000;pointer-events:none}
   #g3over{display:none;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.72);flex-direction:column;align-items:center;justify-content:center}
   #g3over.show{display:flex}
   #g3over h1{color:#fff;font-size:36px;margin:0 0 12px}
@@ -42,6 +43,7 @@
   <button class="kind" data-k="esfera">Esfera</button>
   <button class="kind" data-k="cilindro">Cilindro</button>
   <button class="kind" data-k="inimigo" title="Persegue o player">Inimigo</button>
+  <button class="kind" data-k="atirador" title="Fica parado e atira no player">Atirador</button>
   <button class="kind" data-k="moeda" title="Colete para vencer">Moeda</button>
   <button class="kind" data-k="saida" title="Chegue aqui para vencer">Saída</button>
   <input type="color" id="col" value="#8a5a34">
@@ -58,6 +60,7 @@
 
 <div id="g3hud"></div>
 <div id="g3flash"></div>
+<div id="g3cross">✛</div>
 <div id="g3over"><h1 id="g3overt"></h1><button id="g3restart" class="primary" style="font-size:16px;padding:10px 20px">↻ Jogar de novo</button></div>
 <div id="cf3"><div class="card"><div id="cf3msg" style="font-size:13px;color:#dff3e6"></div><div class="b"><button onclick="_cfDo(false)">Cancelar</button><button class="primary" onclick="_cfDo(true)">Confirmar</button></div></div></div>
 <div id="toast3"></div>
@@ -90,7 +93,8 @@ function makeObj(o){ const e=document.createElement('a-entity'); e._d={x:o.x,y:o
   if(o.type==='parede'){ g='primitive: box; height: 2; width: 1; depth: 1'; py=o.y+0.5; e._d.tall=true; cls+=' solid'; }
   else if(o.type==='esfera'){ g='primitive: sphere; radius: 0.5'; cls+=' solid'; }
   else if(o.type==='cilindro'){ g='primitive: cylinder; radius: 0.5; height: 1'; cls+=' solid'; }
-  else if(o.type==='inimigo'){ g='primitive: box; height: 1.2; width: 0.7; depth: 0.7'; py=o.y+0.1; mat='color: '+(o.color||'#e74c3c')+'; emissive: #3a0f0f; emissiveIntensity: 0.45'; cls+=' enemy'; }
+  else if(o.type==='inimigo'){ g='primitive: box; height: 1.2; width: 0.7; depth: 0.7'; py=o.y+0.1; mat='color: '+(o.color||'#e74c3c')+'; emissive: #3a0f0f; emissiveIntensity: 0.45'; cls+=' foe chaser'; }
+  else if(o.type==='atirador'){ g='primitive: box; height: 1.2; width: 0.7; depth: 0.7'; py=o.y+0.1; mat='color: '+(o.color||'#e67e22')+'; emissive: #3a220f; emissiveIntensity: 0.5'; cls+=' foe shooter'; }
   else if(o.type==='moeda'){ g='primitive: torus; radius: 0.32; radius-tubular: 0.12'; py=o.y+0.3; rot='90 0 0'; mat='color: '+(o.color||'#f1c40f')+'; emissive:#5a4a00; emissiveIntensity:0.35'; cls+=' coin'; }
   else if(o.type==='saida'){ g='primitive: torus; radius: 0.7; radius-tubular: 0.13'; py=o.y+0.7; mat='color: '+(o.color||'#7FFFD4')+'; emissive:#0a5a3a; emissiveIntensity:0.5'; cls+=' exit'; }
   else { g='primitive: box; height: 1; width: 1; depth: 1'; cls+=' solid'; }
@@ -141,14 +145,26 @@ AFRAME.registerComponent('fpsmove',FPSMOVE);
 
 /* regras do jogo: inimigos, moedas, saida, vida */
 const GAMEPLAY={
-  init(){ this.hp=3; this.coins=0; this.total=document.querySelectorAll('#world .coin').length; this.over=false; this.cd=0; this.msg=''; this.msgT=0; this.updHud(); const o=document.getElementById('g3over'); if(o)o.classList.remove('show'); },
-  updHud(){ const h=document.getElementById('g3hud'); if(!h)return; let s=''; for(let i=0;i<this.hp;i++)s+='❤'; if(this.hp<=0)s='💀'; h.textContent=s+'   🪙 '+this.coins+(this.total?('/'+this.total):'')+(this.msg?('   '+this.msg):''); },
+  init(){ this.hp=5; this.coins=0; this.total=document.querySelectorAll('#world .coin').length; this.over=false; this.cd=0; this.msg=''; this.msgT=0; this.kills=0; this.cam=this.el.querySelector('[camera]');
+    document.querySelectorAll('#world .foe').forEach(function(f){ f._hp=3; });
+    var self=this; this.onDown=function(){ if(!self.over) self.shoot(); }; window.addEventListener('mousedown', this.onDown);
+    var cr=document.getElementById('g3cross'); if(cr)cr.style.display='block';
+    this.updHud(); var o=document.getElementById('g3over'); if(o)o.classList.remove('show'); },
+  remove(){ if(this.onDown)window.removeEventListener('mousedown',this.onDown); var cr=document.getElementById('g3cross'); if(cr)cr.style.display='none'; },
+  updHud(){ const h=document.getElementById('g3hud'); if(!h)return; let s=''; for(let i=0;i<this.hp;i++)s+='❤'; if(this.hp<=0)s='💀'; h.textContent=s+'   🪙 '+this.coins+(this.total?('/'+this.total):'')+'   💥 '+this.kills+(this.msg?('   '+this.msg):''); },
   flash(){ const f=document.getElementById('g3flash'); if(!f)return; f.style.opacity='0.5'; setTimeout(function(){ f.style.opacity='0'; },120); },
-  end(txt){ this.over=true; const o=document.getElementById('g3over'), t=document.getElementById('g3overt'); if(t)t.textContent=txt; if(o)o.classList.add('show'); if(document.exitPointerLock)document.exitPointerLock(); },
+  end(txt){ this.over=true; const o=document.getElementById('g3over'), t=document.getElementById('g3overt'); if(t)t.textContent=txt; if(o)o.classList.add('show'); var cr=document.getElementById('g3cross'); if(cr)cr.style.display='none'; if(document.exitPointerLock)document.exitPointerLock(); },
+  mkBullet(x,y,z,vx,vy,vz,cls,color){ const b=document.createElement('a-entity'); b.setAttribute('geometry','primitive: sphere; radius: 0.12'); b.setAttribute('material','color: '+color+'; emissive: '+color+'; emissiveIntensity: 0.9'); b.setAttribute('position',x+' '+y+' '+z); b.className=cls; b._v={x:vx,y:vy,z:vz}; b._life=2.2; document.querySelector('#scene').appendChild(b); return b; },
+  shoot(){ if(!this.cam)this.cam=this.el.querySelector('[camera]'); const cam=this.cam; if(!cam||typeof THREE==='undefined')return; const dir=new THREE.Vector3(); cam.object3D.getWorldDirection(dir); dir.multiplyScalar(-1); const p=new THREE.Vector3(); cam.object3D.getWorldPosition(p); const sp=20; this.mkBullet(p.x+dir.x*0.6,p.y+dir.y*0.6,p.z+dir.z*0.6, dir.x*sp,dir.y*sp,dir.z*sp,'pbullet','#7FFFD4'); },
   tick(t,dtms){ if(this.over)return; const dt=Math.min(0.05,(dtms||16)/1000); const pl=window._pl; if(!pl)return; const pp=pl.object3D.position; const self=this;
     if(this.cd>0)this.cd-=dt; if(this.msgT>0){ this.msgT-=dt; if(this.msgT<=0){ this.msg=''; this.updHud(); } }
-    document.querySelectorAll('#world .enemy').forEach(function(en){ const ep=en.object3D.position; const dx=pp.x-ep.x, dz=pp.z-ep.z; const d=Math.hypot(dx,dz)||1; if(d>0.8){ ep.x+=dx/d*2.2*dt; ep.z+=dz/d*2.2*dt; } en.object3D.rotation.y=Math.atan2(dx,dz);
+    document.querySelectorAll('#world .chaser').forEach(function(en){ const ep=en.object3D.position; const dx=pp.x-ep.x, dz=pp.z-ep.z; const d=Math.hypot(dx,dz)||1; if(d>0.8){ ep.x+=dx/d*2.2*dt; ep.z+=dz/d*2.2*dt; } en.object3D.rotation.y=Math.atan2(dx,dz);
       if(d<1.0 && self.cd<=0){ self.hp--; self.cd=1.1; self.flash(); self.updHud(); if(self.hp<=0)self.end('FIM DE JOGO'); } });
+    document.querySelectorAll('#world .shooter').forEach(function(en){ const ep=en.object3D.position; const dx=pp.x-ep.x, dy=pp.y-ep.y, dz=pp.z-ep.z; const d=Math.hypot(dx,dz)||1; en.object3D.rotation.y=Math.atan2(dx,dz); if(en._sc===undefined)en._sc=1.5; en._sc-=dt; if(en._sc<=0 && d<24){ en._sc=1.8; const L=Math.hypot(dx,dy,dz)||1; const sp=12; self.mkBullet(ep.x+dx/L*0.8, ep.y+1+dy/L*0.8, ep.z+dz/L*0.8, dx/L*sp, dy/L*sp, dz/L*sp,'ebullet','#ff5a3c'); } });
+    document.querySelectorAll('#scene > .pbullet').forEach(function(b){ b._life-=dt; const p=b.object3D.position; p.x+=b._v.x*dt; p.y+=b._v.y*dt; p.z+=b._v.z*dt; let hit=false;
+      document.querySelectorAll('#world .foe').forEach(function(fo){ if(hit)return; const fp=fo.object3D.position; if(Math.hypot(p.x-fp.x,p.y-fp.y,p.z-fp.z)<0.85){ hit=true; fo._hp=(fo._hp||3)-1; try{fo.setAttribute('material','color: #ffffff');}catch(e){} if(fo._hp<=0){ fo.parentNode.removeChild(fo); self.kills++; self.updHud(); } else { setTimeout(function(){ try{ fo.setAttribute('material','color: '+((fo._d&&fo._d.color)||'#e74c3c')); }catch(e){} },80); } } });
+      if(hit||b._life<=0){ if(b.parentNode)b.parentNode.removeChild(b); } });
+    document.querySelectorAll('#scene > .ebullet').forEach(function(b){ b._life-=dt; const p=b.object3D.position; p.x+=b._v.x*dt; p.y+=b._v.y*dt; p.z+=b._v.z*dt; if(Math.hypot(p.x-pp.x,p.y-pp.y,p.z-pp.z)<0.85){ if(b.parentNode)b.parentNode.removeChild(b); if(self.cd<=0){ self.hp--; self.cd=0.6; self.flash(); self.updHud(); if(self.hp<=0)self.end('FIM DE JOGO'); } return; } if(b._life<=0 && b.parentNode)b.parentNode.removeChild(b); });
     document.querySelectorAll('#world .coin').forEach(function(c){ c.object3D.rotation.z+=dt*3; const cp=c.object3D.position; if(Math.hypot(pp.x-cp.x,pp.z-cp.z)<1.0 && Math.abs(pp.y-cp.y)<2.2){ c.parentNode.removeChild(c); self.coins++; self.updHud(); } });
     const ex=document.querySelector('#world .exit'); if(ex){ ex.object3D.rotation.y+=dt*1.5; const xp=ex.object3D.position; if(Math.hypot(pp.x-xp.x,pp.z-xp.z)<1.3){ if(self.total===0||self.coins>=self.total){ self.end('VOCÊ VENCEU!'); } else { self.msg='Pegue as moedas ('+self.coins+'/'+self.total+')'; self.msgT=1.5; self.updHud(); } } }
   }
@@ -195,8 +211,8 @@ function buildExport3D(){
   const sceneHTML='<a-scene id="scene" vr-mode-ui="enabled: false" background="color: #0a0f0c"><a-light type="ambient" color="#8899aa" intensity="0.7"></a-light><a-light type="directional" position="4 10 6" intensity="0.8"></a-light><a-sky color="#0a141c"></a-sky><a-plane id="ground" class="ray" rotation="-90 0 0" width="120" height="120" position="0 0 0" material="color: #2e7d32; side: double"></a-plane><a-entity id="world"></a-entity></a-scene>';
   return '<!DOCTYPE html>\n<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Jogo 3D</title>'
     +'<scr'+'ipt src="https://aframe.io/releases/1.5.0/aframe.min.js"><\/scr'+'ipt>'
-    +'<style>html,body{margin:0;height:100%;overflow:hidden;background:#0a0f0c;font-family:system-ui}#g3hud{display:none;position:fixed;top:8px;left:8px;z-index:55;color:#dff3e6;font-size:18px;text-shadow:0 1px 3px #000}#g3flash{position:fixed;inset:0;z-index:54;background:#ff2b2b;opacity:0;pointer-events:none;transition:opacity .12s}#g3over{display:none;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.72);flex-direction:column;align-items:center;justify-content:center}#g3over.show{display:flex}#g3over h1{color:#fff;font-size:36px;margin:0 0 12px}#g3over button{font-size:16px;padding:10px 20px;border-radius:8px;border:1px solid #7FFFD4;background:#1f4a35;color:#7FFFD4;cursor:pointer}#hint{position:fixed;bottom:8px;left:8px;z-index:50;color:#8fb89c;font-size:12px;background:rgba(0,0,0,.4);padding:5px 9px;border-radius:6px}</style></head>'
-    +'<body><div id="g3hud"></div><div id="g3flash"></div><div id="hint">WASD anda • mouse olha • Espaço pula • clique para travar o mouse • R reinicia</div><div id="g3over"><h1 id="g3overt"></h1><button onclick="location.reload()">↻ Jogar de novo</button></div>'
+    +'<style>html,body{margin:0;height:100%;overflow:hidden;background:#0a0f0c;font-family:system-ui}#g3hud{display:none;position:fixed;top:8px;left:8px;z-index:55;color:#dff3e6;font-size:18px;text-shadow:0 1px 3px #000}#g3flash{position:fixed;inset:0;z-index:54;background:#ff2b2b;opacity:0;pointer-events:none;transition:opacity .12s}#g3cross{display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:56;color:#fff;font-size:22px;text-shadow:0 0 4px #000;pointer-events:none}#g3over{display:none;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.72);flex-direction:column;align-items:center;justify-content:center}#g3over.show{display:flex}#g3over h1{color:#fff;font-size:36px;margin:0 0 12px}#g3over button{font-size:16px;padding:10px 20px;border-radius:8px;border:1px solid #7FFFD4;background:#1f4a35;color:#7FFFD4;cursor:pointer}#hint{position:fixed;bottom:8px;left:8px;z-index:50;color:#8fb89c;font-size:12px;background:rgba(0,0,0,.4);padding:5px 9px;border-radius:6px}</style></head>'
+    +'<body><div id="g3hud"></div><div id="g3flash"></div><div id="g3cross">✛</div><div id="hint">WASD anda • mouse olha • clique ATIRA • Espaço pula • R reinicia</div><div id="g3over"><h1 id="g3overt"></h1><button onclick="location.reload()">↻ Jogar de novo</button></div>'
     + sceneHTML + op+errS2+cl + op+'const DATA='+data+';\n'+runtime+cl + '</body></html>'; }
 $('export').onclick=()=>{ try{ const html=buildExport3D(); const b=new Blob([html],{type:'text/html'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='jogo-3d.html'; a.click(); toast('Jogo 3D exportado!'); }catch(e){ toast('Erro ao exportar: '+e.message); } };
 
