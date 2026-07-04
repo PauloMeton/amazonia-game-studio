@@ -228,10 +228,12 @@ if(this.enemies().length===0) this.win();"></textarea>
     </div>
     <label class="note" style="margin-top:4px">📝 Descrição que a IA fez (edite se quiser — ela vira base dos sprites):</label>
     <textarea id="cenaDesc" rows="2" style="width:100%;resize:vertical;background:#0b120e;color:#dff3e6;border:1px solid var(--line);border-radius:6px;padding:6px" placeholder="ex: plataforma na floresta com herói azul, inimigos vermelhos e moedas amarelas"></textarea>
+    <div id="cenaSprites" style="display:none;flex-wrap:wrap;gap:8px;padding:4px 0"></div>
     <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:6px">
       <span class="note" id="cenaCount">Nenhuma caixa ainda.</span>
       <div class="row" style="gap:6px">
         <button id="cenaAI">🔎 Analisar com IA (online)</button>
+        <button id="cenaPrev">👁 Prévia dos sprites</button>
         <button id="cenaGen" class="primary">🎨 Criar jogo (sprites novos)</button>
       </div>
     </div>
@@ -1351,9 +1353,9 @@ const CENA_TAGS={
 const Cena={ img:null, orig:null, pxLevel:0, pxQuant:true, boxes:[], sel:-1, tag:'chao', scale:1, drag:null };
 function cenaOpen(){ g('cenaModal').classList.add('open'); const cv=g('cenaCanvas'); if(!Cena.img){ cv.width=620; cv.height=280; } else cenaFit(); cenaRenderPalette(); cenaDraw(); }
 function cenaClose(){ g('cenaModal').classList.remove('open'); }
-function cenaRenderPalette(){ const w=g('cenaPalette'); if(!w)return; w.innerHTML=''; Object.keys(CENA_TAGS).forEach(k=>{ const t=CENA_TAGS[k]; const b=document.createElement('button'); b.textContent=t.label; b.style.borderColor=t.color; b.style.color=t.color; if(Cena.tag===k){ b.style.background=t.color; b.style.color='#0b120e'; } b.onclick=()=>{ Cena.tag=k; if(Cena.sel>=0&&Cena.boxes[Cena.sel]){ Cena.boxes[Cena.sel].tag=k; } cenaRenderPalette(); cenaDraw(); }; w.appendChild(b); }); }
+function cenaRenderPalette(){ const w=g('cenaPalette'); if(!w)return; w.innerHTML=''; Object.keys(CENA_TAGS).forEach(k=>{ const t=CENA_TAGS[k]; const b=document.createElement('button'); b.textContent=t.label; b.style.borderColor=t.color; b.style.color=t.color; if(Cena.tag===k){ b.style.background=t.color; b.style.color='#0b120e'; } b.onclick=()=>{ Cena.tag=k; if(Cena.sel>=0&&Cena.boxes[Cena.sel]){ Cena.boxes[Cena.sel].tag=k; cenaInvalidatePreview(); } cenaRenderPalette(); cenaDraw(); }; w.appendChild(b); }); }
 function cenaPixelize(){ if(!Cena.orig)return; const OW=Cena.orig.width, OH=Cena.orig.height; const tw=Math.max(24,Math.min(OW, (Cena.pxLevel|0)||160)); const th=Math.max(1,Math.round(tw*OH/OW)); const sc=document.createElement('canvas'); sc.width=tw; sc.height=th; const sx=sc.getContext('2d'); sx.imageSmoothingEnabled=true; sx.drawImage(Cena.orig,0,0,tw,th); if(Cena.pxQuant!==false){ try{ const id=sx.getImageData(0,0,tw,th),d=id.data,step=48; for(let i=0;i<d.length;i+=4){ d[i]=Math.min(255,Math.round(d[i]/step)*step); d[i+1]=Math.min(255,Math.round(d[i+1]/step)*step); d[i+2]=Math.min(255,Math.round(d[i+2]/step)*step); } sx.putImageData(id,0,0); }catch(e){} } let url; try{ url=sc.toDataURL('image/png'); }catch(e){ url=''; } Cena.img={ el:sc, w:OW, h:OH, url:url }; }
-function cenaLoadImage(file){ const r=new FileReader(); r.onload=e=>{ const im=new Image(); im.onload=()=>{ const MAX=1280; let w=im.width,h=im.height; const sc=Math.min(1,MAX/Math.max(w,h)); w=Math.round(w*sc); h=Math.round(h*sc); const oc=document.createElement('canvas'); oc.width=w; oc.height=h; oc.getContext('2d').drawImage(im,0,0,w,h); Cena.orig=oc; if(!Cena.pxLevel)Cena.pxLevel=Math.min(200,w); cenaPixelize(); Cena.boxes=[]; Cena.sel=-1; if(g('cenaPx'))g('cenaPx').value=Cena.pxLevel; if(g('cenaQuant'))g('cenaQuant').checked=Cena.pxQuant!==false; Cena.descEdited=false; cenaFit(); cenaAutoDetect(); cenaAnalyze(true); g('cenaOut').textContent='Imagem analisada. Veja/edite a descrição abaixo e clique em Criar jogo (a IA vai gerar sprites novos).'; }; im.onerror=()=>{ g('cenaOut').textContent='Imagem inválida.'; }; im.src=e.target.result; }; r.readAsDataURL(file); }
+function cenaLoadImage(file){ const r=new FileReader(); r.onload=e=>{ const im=new Image(); im.onload=()=>{ const MAX=1280; let w=im.width,h=im.height; const sc=Math.min(1,MAX/Math.max(w,h)); w=Math.round(w*sc); h=Math.round(h*sc); const oc=document.createElement('canvas'); oc.width=w; oc.height=h; oc.getContext('2d').drawImage(im,0,0,w,h); Cena.orig=oc; if(!Cena.pxLevel)Cena.pxLevel=Math.min(200,w); cenaPixelize(); Cena.boxes=[]; Cena.sel=-1; if(g('cenaPx'))g('cenaPx').value=Cena.pxLevel; if(g('cenaQuant'))g('cenaQuant').checked=Cena.pxQuant!==false; Cena.descEdited=false; cenaFit(); cenaAutoDetect(); cenaAnalyze(true); cenaInvalidatePreview(); g('cenaOut').textContent='Imagem analisada. Veja/edite a descrição abaixo e clique em Criar jogo (a IA vai gerar sprites novos).'; }; im.onerror=()=>{ g('cenaOut').textContent='Imagem inválida.'; }; im.src=e.target.result; }; r.readAsDataURL(file); }
 function cenaFit(){ const cv=g('cenaCanvas'); if(!cv||!Cena.img)return; const maxW=Math.min(860, (window.innerWidth||1000)*0.9); Cena.scale=Math.min(1, maxW/Cena.img.w); cv.width=Math.round(Cena.img.w*Cena.scale); cv.height=Math.round(Cena.img.h*Cena.scale); }
 function cenaDraw(){ const cv=g('cenaCanvas'); if(!cv)return; const x=cv.getContext('2d'); x.clearRect(0,0,cv.width,cv.height); if(!Cena.img){ x.fillStyle='#0b120e'; x.fillRect(0,0,cv.width,cv.height); x.fillStyle='#9fb8a6'; x.font='14px system-ui'; x.fillText('Escolha uma imagem do cenário para começar…', 16, 30); return; } const s=Cena.scale; x.imageSmoothingEnabled=false; x.drawImage(Cena.img.el,0,0,cv.width,cv.height); Cena.boxes.forEach((b,i)=>{ const t=CENA_TAGS[b.tag]||CENA_TAGS.chao; x.lineWidth=(i===Cena.sel)?3:2; x.strokeStyle=t.color; x.fillStyle=t.color+'33'; x.fillRect(b.x*s,b.y*s,b.w*s,b.h*s); x.strokeRect(b.x*s,b.y*s,b.w*s,b.h*s); x.fillStyle=t.color; x.font='11px system-ui'; x.fillText(t.label,(b.x*s)+3,(b.y*s)+12); if(i===Cena.sel){ x.fillStyle=t.color; x.fillRect((b.x+b.w)*s-8,(b.y+b.h)*s-8,8,8); } }); const c=g('cenaCount'); if(c)c.textContent=Cena.boxes.length?(Cena.boxes.length+' caixa(s). Selecionada: '+(Cena.sel>=0?(CENA_TAGS[Cena.boxes[Cena.sel].tag].label):'nenhuma')):'Nenhuma caixa ainda.'; }
 function cenaHit(mx,my){ for(let i=Cena.boxes.length-1;i>=0;i--){ const b=Cena.boxes[i]; if(mx>=b.x&&mx<=b.x+b.w&&my>=b.y&&my<=b.y+b.h)return i; } return -1; }
@@ -1366,7 +1368,7 @@ function cenaMouse(ev,type){ const cv=g('cenaCanvas'); if(!cv||!Cena.img)return;
     else if(Cena.drag.mode==='move'){ b.x=Math.max(0,Math.min(Cena.img.w-b.w,mx-Cena.drag.ox)); b.y=Math.max(0,Math.min(Cena.img.h-b.h,my-Cena.drag.oy)); }
     else if(Cena.drag.mode==='resize'){ b.w=Math.max(4,mx-b.x); b.h=Math.max(4,my-b.y); }
     cenaDraw(); return; }
-  if(type==='up'){ if(Cena.drag&&Cena.drag.mode==='new'){ const b=Cena.boxes[Cena.sel]; if(b&&(b.w<6||b.h<6)){ Cena.boxes.pop(); Cena.sel=-1; } } Cena.drag=null; cenaRenderPalette(); cenaDraw(); } }
+  if(type==='up'){ if(Cena.drag&&Cena.drag.mode==='new'){ const b=Cena.boxes[Cena.sel]; if(b&&(b.w<6||b.h<6)){ Cena.boxes.pop(); Cena.sel=-1; } } if(Cena.drag)cenaInvalidatePreview(); Cena.drag=null; cenaRenderPalette(); cenaDraw(); } }
 function cenaAutoDetect(){ if(!Cena.img)return; const IW=Cena.img.w, IH=Cena.img.h; const AW=Math.min(80,IW), AH=Math.max(1,Math.round(AW*IH/IW)); const oc=document.createElement('canvas'); oc.width=AW; oc.height=AH; const ox=oc.getContext('2d'); ox.drawImage(Cena.img.el,0,0,AW,AH); const d=ox.getImageData(0,0,AW,AH).data;
   const at=(x,y)=>{ const i=(y*AW+x)*4; return [d[i],d[i+1],d[i+2],d[i+3]]; };
   const _cnt={}; let _bk=null,_bn=0; for(let y=0;y<AH;y++)for(let x=0;x<AW;x++){ const c=at(x,y); if(c[3]<40)continue; const k=((c[0]>>5)<<6)|((c[1]>>5)<<3)|(c[2]>>5); _cnt[k]=(_cnt[k]||0)+1; if(_cnt[k]>_bn){_bn=_cnt[k];_bk=k;} }
@@ -1437,30 +1439,38 @@ function imgUrlToPixelRaw(url,MAX){ return new Promise(function(resolve){ const 
   img.src=url; }); }
 function cenaGenSprite(prompt,fallback,max){ return new Promise(function(resolve){ const url='https://image.pollinations.ai/prompt/'+encodeURIComponent(prompt)+'?width=128&height=128&nologo=true&seed='+Math.floor(Math.random()*99999); imgUrlToPixelRaw(url,max||32).then(function(raw){ resolve(raw||fallback()); }).catch(function(){ resolve(fallback()); }); }); }
 function cenaModeFromText(t){ t=(t||'').toLowerCase(); if(/top-?down|de cima|visto de cima|vista superior|masmorra|labirinto|zelda|dungeon|aerea|aérea|top view|top-view/.test(t))return 'topdown'; if(/plataforma|lateral|side-?scroll|side scroller|corredor lateral|jump/.test(t))return 'platformer'; return ''; }
-async function cenaGenerate(){ if(!Cena.img){ g('cenaOut').textContent='Escolha uma imagem primeiro.'; return; } if(!Cena.boxes.length){ cenaAutoDetect(); }
-  if(!await confirmDialog('A IA vai analisar a imagem, criar SPRITES NOVOS a partir da descrição e montar o jogo. O projeto atual fica salvo localmente até você salvar de novo.')) return;
-  const A=Cena.analysis||cenaAnalyze(false); let descText=(g('cenaDesc')&&g('cenaDesc').value.trim())||'';
-  if(!Cena.descEdited){ g('cenaOut').textContent='🔎 A IA está olhando a imagem…'; try{ const v=await cenaVisionDescribe(); if(v){ descText=v; if(g('cenaDesc'))g('cenaDesc').value=v; } }catch(e){} }
+function cenaThumb(raw,px){ const c=document.createElement('canvas'); const w=(raw&&raw.w)||16,h=(raw&&raw.h)||16; c.width=px;c.height=px; const x=c.getContext('2d'); x.imageSmoothingEnabled=false; const clip=raw&&raw.clips&&(raw.clips.idle||raw.clips[Object.keys(raw.clips)[0]]); const fr=(clip&&clip[0])||[]; const sc=Math.max(1,Math.floor(px/Math.max(w,h))); const ox=Math.floor((px-w*sc)/2), oy=Math.floor((px-h*sc)/2); for(let i=0;i<w*h;i++){ const col=fr[i]; if(!col)continue; x.fillStyle=col; x.fillRect(ox+(i%w)*sc, oy+((i/w)|0)*sc, sc, sc); } return c; }
+function cenaInvalidatePreview(){ Cena.spritesR=null; Cena.previewPlan=null; const w=g('cenaSprites'); if(w){ w.innerHTML=''; w.style.display='none'; } }
+async function cenaComputePlan(withVision){ const A=Cena.analysis||cenaAnalyze(false); let descText=(g('cenaDesc')&&g('cenaDesc').value.trim())||'';
+  if(withVision && !Cena.descEdited){ try{ const v=await cenaVisionDescribe(); if(v){ descText=v; if(g('cenaDesc'))g('cenaDesc').value=v; } }catch(e){} }
   if(!descText) descText=A.desc||'';
   const theme=cenaThemeFromText(descText)||A.theme||'floresta';
   const ground=Cena.boxes.find(b=>b.tag==='chao'&&b.y>Cena.img.h*0.5&&b.w>Cena.img.w*0.5);
   let mode=cenaModeFromText(descText)||(ground?'platformer':(g('cenaMode')?g('cenaMode').value:'platformer')); if(g('cenaMode'))g('cenaMode').value=mode;
   const tags=Cena.boxes.map(b=>b.tag);
-  // agrupar inimigos por cor -> tipos
   const groups=[]; Cena.boxes.filter(b=>b.tag==='inimigo').forEach(b=>{ const c=cenaBoxColor(b); let gi=groups.findIndex(gr=>Math.abs(gr.color[0]-c[0])+Math.abs(gr.color[1]-c[1])+Math.abs(gr.color[2]-c[2])<95); if(gi<0){ if(groups.length<3){ gi=groups.length; groups.push({color:c,id:'enemy'+gi,colorName:cenaColorName(c)}); } else gi=0; } b._eg=groups[gi].id; });
   if(!groups.length && tags.includes('inimigo')) groups.push({color:[200,60,60],id:'enemy0',colorName:'vermelho'});
-  g('cenaOut').textContent='🎨 Criando sprites novos com a IA (pode levar alguns segundos)…';
   const TH={floresta:['#08160d','#2e7d32'],caverna:['#0b0b10','#4a4a55'],gelo:['#0a1622','#5aa0c0'],deserto:['#1c1408','#c2a25a'],lava:['#160707','#a83a1a'],'espaço':['#05050f','#39406e'],cidade:['#0d0d12','#5a5a66']}; const tc=TH[theme]||['#0a0f0c','#3a5d44'];
-  const jobs=[]; jobs.push({id:'hero',prompt:cenaSpritePrompt('main hero player character', A.playerColor, theme, descText),fb:makeHero,max:36});
-  groups.forEach(gr=>jobs.push({id:gr.id,prompt:cenaSpritePrompt('enemy creature monster ('+gr.colorName+')', gr.colorName, theme, descText),fb:makeEnemy,max:36}));
-  jobs.push({id:'coin',prompt:cenaSpritePrompt('collectible pickup item coin', A.coinColor, theme, descText),fb:makeCoin,max:26});
-  if(tags.includes('perigo')) jobs.push({id:'spike',prompt:cenaSpritePrompt('dangerous spike trap hazard', '', theme, descText),fb:makeSpike,max:30});
-  if(tags.includes('saida')) jobs.push({id:'exit',prompt:cenaSpritePrompt('glowing exit portal goal door', '', theme, descText),fb:makeCoin,max:30});
-  let raws; let _dn=0; const _tot=jobs.length; const _up=()=>{ if(g('cenaOut'))g('cenaOut').textContent='🎨 Gerando sprites com a IA… '+_dn+'/'+_tot; }; _up();
-  try{ raws=await Promise.all(jobs.map(j=>cenaGenSprite(j.prompt,j.fb,j.max).then(r=>{ _dn++; _up(); return r; }))); }catch(e){ raws=jobs.map(j=>j.fb()); }
-  const R={}; jobs.forEach((j,i)=>R[j.id]=raws[i]||j.fb());
-  const assets=[{id:'hero',name:'heroi',raw:R.hero}];
-  groups.forEach(gr=>assets.push({id:gr.id,name:'inimigo '+gr.colorName,raw:R[gr.id]}));
+  const jobs=[]; jobs.push({id:'hero',label:'Herói',prompt:cenaSpritePrompt('main hero player character', A.playerColor, theme, descText),fb:makeHero,max:36});
+  groups.forEach(gr=>jobs.push({id:gr.id,label:'Inimigo '+gr.colorName,prompt:cenaSpritePrompt('enemy creature monster ('+gr.colorName+')', gr.colorName, theme, descText),fb:makeEnemy,max:36}));
+  jobs.push({id:'coin',label:'Moeda',prompt:cenaSpritePrompt('collectible pickup item coin', A.coinColor, theme, descText),fb:makeCoin,max:26});
+  if(tags.includes('perigo')) jobs.push({id:'spike',label:'Perigo',prompt:cenaSpritePrompt('dangerous spike trap hazard', '', theme, descText),fb:makeSpike,max:30});
+  if(tags.includes('saida')) jobs.push({id:'exit',label:'Saída',prompt:cenaSpritePrompt('glowing exit portal goal door', '', theme, descText),fb:makeCoin,max:30});
+  return {descText:descText,theme:theme,mode:mode,tc:tc,groups:groups,jobs:jobs,tags:tags}; }
+async function cenaGenJobs(jobs, reuse){ const R=Object.assign({}, reuse?(Cena.spritesR||{}):{}); let dn=0; const tot=jobs.length; const up=()=>{ if(g('cenaOut'))g('cenaOut').textContent='🎨 Gerando sprites… '+dn+'/'+tot; }; up();
+  await Promise.all(jobs.map(async j=>{ if(reuse && R[j.id]){ dn++; up(); return; } let r; try{ r=await cenaGenSprite(j.prompt,j.fb,j.max); }catch(e){ r=j.fb(); } R[j.id]=r||j.fb(); dn++; up(); })); return R; }
+function cenaRenderSprites(jobs,R){ const w=g('cenaSprites'); if(!w)return; w.style.display='flex'; w.innerHTML=''; jobs.forEach(j=>{ const d=document.createElement('div'); d.style.cssText='display:flex;flex-direction:column;align-items:center;gap:2px;width:64px'; const cv=cenaThumb(R[j.id]||j.fb(),56); cv.style.cssText='background:#0b120e;border:1px solid var(--line);border-radius:6px;width:56px;height:56px'; d.appendChild(cv); const nm=document.createElement('div'); nm.className='note'; nm.style.cssText='font-size:10px;text-align:center;line-height:1.1'; nm.textContent=j.label; d.appendChild(nm); const b=document.createElement('button'); b.textContent='🔄'; b.title='Gerar este sprite de novo'; b.style.cssText='padding:1px 6px;font-size:11px'; b.onclick=()=>cenaRegen(j.id); d.appendChild(b); w.appendChild(d); }); }
+async function cenaRegen(id){ if(!Cena.previewPlan)return; const j=Cena.previewPlan.jobs.find(x=>x.id===id); if(!j)return; if(g('cenaOut'))g('cenaOut').textContent='🔄 Refazendo '+j.label+'…'; let r; try{ r=await cenaGenSprite(j.prompt,j.fb,j.max); }catch(e){ r=j.fb(); } Cena.spritesR=Cena.spritesR||{}; Cena.spritesR[id]=r||j.fb(); cenaRenderSprites(Cena.previewPlan.jobs, Cena.spritesR); if(g('cenaOut'))g('cenaOut').textContent='🔄 '+j.label+' atualizado.'; }
+async function cenaPreview(){ if(!Cena.img){ g('cenaOut').textContent='Escolha uma imagem primeiro.'; return; } if(!Cena.boxes.length){ cenaAutoDetect(); }
+  g('cenaOut').textContent='🔎 Analisando e gerando prévia dos sprites…';
+  const plan=await cenaComputePlan(true); Cena.previewPlan=plan; Cena.spritesR=await cenaGenJobs(plan.jobs,false); cenaRenderSprites(plan.jobs, Cena.spritesR); g('cenaOut').textContent='✅ Prévia pronta — 🔄 refaz um sprite, ou clique em "Criar jogo".'; }
+async function cenaGenerate(){ if(!Cena.img){ g('cenaOut').textContent='Escolha uma imagem primeiro.'; return; } if(!Cena.boxes.length){ cenaAutoDetect(); }
+  if(!await confirmDialog('Montar o jogo com estes sprites e cenas? O projeto atual fica salvo localmente até você salvar de novo.')) return;
+  let plan=Cena.previewPlan, R=Cena.spritesR;
+  if(!plan || !R){ g('cenaOut').textContent='🔎 A IA está olhando a imagem…'; plan=await cenaComputePlan(true); R=await cenaGenJobs(plan.jobs,false); }
+  const theme=plan.theme, mode=plan.mode, tc=plan.tc, groups=plan.groups, tags=plan.tags;
+  const assets=[{id:'hero',name:'heroi',raw:R.hero||makeHero()}];
+  groups.forEach(gr=>assets.push({id:gr.id,name:'inimigo '+gr.colorName,raw:R[gr.id]||makeEnemy()}));
   assets.push({id:'coin',name:'moeda',raw:R.coin||makeCoin()});
   assets.push({id:'spike',name:'espinho',raw:R.spike||makeSpike()});
   assets.push({id:'exit',name:'saida',raw:R.exit||makeCoin()});
@@ -1483,7 +1493,7 @@ async function cenaGenerate(){ if(!Cena.img){ g('cenaOut').textContent='Escolha 
   const globalScript=hasSaida?"var a=gameApi(dt); if(!a.find('saida')) a.win();":'';
   const scene={name:'cenário',mode:mode,tile:T,gravity:mode==='platformer'?1800:0,bg:tc[0],tileColor:tc[1],bgImage:'',bgW:0,bgH:0,bgLayers:[],grid:grid,layers:[{id:'L1',name:'Cenário',visible:true},{id:'L2',name:'Objetos',visible:true}],active:'L2',globalScript:globalScript,entities:ents};
   const proj={v:2,name:'jogo-da-analise',cur:0,target:'desktop',touchctl:'auto',camZoom:1,sound:true,assets:assets,scenes:[scene]};
-  loadProject(proj); cenaClose(); touch(); logMsg('🎨 Jogo criado! A IA analisou a imagem, gerou sprites novos ('+assets.length+' tipos) e montou a fase ('+mode+'). Clique ▶ Jogar.'); }
+  loadProject(proj); cenaInvalidatePreview(); cenaClose(); touch(); logMsg('🎨 Jogo criado! Sprites novos ('+assets.length+' tipos) e fase montada ('+mode+'). Clique ▶ Jogar.'); }
 
 
 /* ============ SOM (efeitos) ============ */
@@ -1560,12 +1570,12 @@ function wire(){ buildTools(); setTool('select');
   g('btnCena').onclick=cenaOpen; g('cenaClose').onclick=cenaClose;
   g('cenaFileBtn').onclick=()=>g('cenaFile').click();
   g('cenaFile').onchange=e=>{ if(e.target.files&&e.target.files[0])cenaLoadImage(e.target.files[0]); e.target.value=''; };
-  g('cenaAuto').onclick=()=>{ if(!Cena.img){g('cenaOut').textContent='Escolha uma imagem primeiro.';return;} cenaAutoDetect(); g('cenaOut').textContent='Detecção refeita — ajuste as caixas.'; };
+  g('cenaAuto').onclick=()=>{ if(!Cena.img){g('cenaOut').textContent='Escolha uma imagem primeiro.';return;} cenaAutoDetect(); cenaInvalidatePreview(); g('cenaOut').textContent='Detecção refeita — ajuste as caixas.'; };
   if(g('cenaPx'))g('cenaPx').oninput=()=>{ Cena.pxLevel=+g('cenaPx').value; if(Cena.orig){ cenaPixelize(); cenaDraw(); } };
   if(g('cenaQuant'))g('cenaQuant').onchange=()=>{ Cena.pxQuant=g('cenaQuant').checked; if(Cena.orig){ cenaPixelize(); cenaDraw(); } };
-  g('cenaClear').onclick=()=>{ Cena.boxes=[]; Cena.sel=-1; cenaDraw(); };
-  g('cenaDel').onclick=()=>{ if(Cena.sel>=0){ Cena.boxes.splice(Cena.sel,1); Cena.sel=-1; cenaRenderPalette(); cenaDraw(); } };
-  g('cenaGen').onclick=cenaGenerate; g('cenaAI').onclick=cenaAI;
+  g('cenaClear').onclick=()=>{ Cena.boxes=[]; Cena.sel=-1; cenaInvalidatePreview(); cenaDraw(); };
+  g('cenaDel').onclick=()=>{ if(Cena.sel>=0){ Cena.boxes.splice(Cena.sel,1); Cena.sel=-1; cenaInvalidatePreview(); cenaRenderPalette(); cenaDraw(); } };
+  g('cenaGen').onclick=cenaGenerate; g('cenaAI').onclick=cenaAI; if(g('cenaPrev'))g('cenaPrev').onclick=cenaPreview;
   if(g('cenaDesc'))g('cenaDesc').oninput=()=>{ Cena.descEdited=true; };
   if(g('tglLeft'))g('tglLeft').onclick=()=>togglePanel('left');
   if(g('tglRight'))g('tglRight').onclick=()=>togglePanel('right');
