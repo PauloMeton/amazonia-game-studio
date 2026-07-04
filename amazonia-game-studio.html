@@ -346,6 +346,7 @@ if(this.enemies().length===0) this.win();"></textarea>
     <div class="menu"><button class="menubtn" id="mFile">📄 Arquivo ▾</button><div class="menupop">
       <button id="btnNew">🆕 Novo projeto</button>
       <button id="btnOpenJson">📂 Abrir .json</button>
+      <button id="btnLocal">🗂️ Meus jogos (backup)</button>
       <button id="btnExportJson">💾 Exportar .json</button>
       <button id="btnExportGame">⬇ Exportar jogo (HTML)</button>
       <button id="btnExportApp">📦 Exportar app</button>
@@ -1028,7 +1029,19 @@ function renderScenes(){ const w=g('sceneList'); if(!w)return; w.innerHTML=''; P
   w.querySelectorAll('[data-dup]').forEach(b=>b.onclick=()=>dupScene(+b.dataset.dup));
   w.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ if(PR.scenes.length>1)confirmDialog('Apagar esta cena?').then(ok=>{ if(ok)delScene(+b.dataset.del); }); }); }
 function syncSceneInputs(){ SND_ON=PR.sound!==false; if(g('soundChk'))g('soundChk').checked=PR.sound!==false; g('projName').value=PR.name; if(g('target'))g('target').value=PR.target||'desktop'; if(g('touchctl'))g('touchctl').value=PR.touchctl||'auto'; if(g('camZoom')){ g('camZoom').value=PR.camZoom||1; g('czVal').textContent=(PR.camZoom||1).toFixed(1); } g('modeSel').value=SC.mode; g('tileSize').value=SC.tile; g('gravity').value=SC.gravity; g('bgColor').value=SC.bg; g('tileColor').value=SC.tileColor; g('gravityRow').style.display=SC.mode==='platformer'?'':'none'; }
-function touch(){ g('saveDot').textContent='salvando...'; clearTimeout(saveT); saveT=setTimeout(()=>{ try{ localStorage.setItem('game_proj',JSON.stringify(serializeProject())); }catch(e){} g('saveDot').textContent='salvo'; pushHistory(); },500); }
+let _quotaWarned=false;
+function touch(){ g('saveDot').textContent='salvando...'; clearTimeout(saveT); saveT=setTimeout(()=>{ try{ localStorage.setItem('game_proj',JSON.stringify(serializeProject())); g('saveDot').textContent='salvo'; _quotaWarned=false; }catch(e){ g('saveDot').textContent='⚠ não salvo'; if(!_quotaWarned){ _quotaWarned=true; toast('Armazenamento cheio — faça um Backup (.json) em Arquivo ▸ Meus jogos e apague jogos antigos.'); } } pushHistory(); },500); }
+/* ===== Biblioteca local + backup ===== */
+function _lsSet(k,v){ try{ localStorage.setItem(k,v); return true; }catch(e){ toast('Armazenamento cheio — faça backup e apague jogos antigos.'); return false; } }
+function libIndex(){ try{ return JSON.parse(localStorage.getItem('gs_lib')||'[]'); }catch(e){ return []; } }
+function libSaveIndex(a){ _lsSet('gs_lib', JSON.stringify(a)); }
+function libUsage(){ let n=0; try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); n+=(localStorage.getItem(k)||'').length+k.length; } }catch(e){} return n; }
+function saveToLibrary(){ const nm=((g('localName').value||PR.name||'meu-jogo').trim())||'meu-jogo'; const id='p'+Date.now().toString(36); if(!_lsSet('gs_p_'+id, JSON.stringify(serializeProject())))return; const idx=libIndex(); idx.unshift({id:id,name:nm,updated:Date.now()}); libSaveIndex(idx); g('localName').value=''; renderLibList(); toast('Jogo salvo: '+nm); }
+function loadFromLibrary(id){ confirmDialog('Carregar este jogo? Salve o atual antes se quiser mantê-lo.').then(ok=>{ if(!ok)return; try{ const r=localStorage.getItem('gs_p_'+id); if(!r){toast('Não encontrado.');return;} loadProject(JSON.parse(r)); touch(); g('localModal').classList.remove('open'); toast('Jogo carregado.'); }catch(e){ toast('Erro ao carregar: '+e.message); } }); }
+function deleteLib(id){ confirmDialog('Apagar este jogo salvo? Não dá pra desfazer.').then(ok=>{ if(!ok)return; try{ localStorage.removeItem('gs_p_'+id); }catch(e){} libSaveIndex(libIndex().filter(x=>x.id!==id)); renderLibList(); toast('Jogo apagado.'); }); }
+function renderLibList(){ const w=g('localList'); if(!w)return; const idx=libIndex(); const u=g('localUse'); if(u)u.textContent='Uso do armazenamento: ~'+Math.round(libUsage()/1024)+' KB • '+idx.length+' jogo(s) salvo(s) neste navegador'; if(!idx.length){ w.innerHTML='<p class="note">Nenhum jogo salvo aqui ainda. Digite um nome e clique em "Salvar cópia".</p>'; return; } w.innerHTML=''; idx.forEach(it=>{ const d=document.createElement('div'); d.className='asset'; const dt=new Date(it.updated||Date.now()); d.innerHTML='<input class="lnm" value="'+esc(it.name)+'" style="flex:1;min-width:80px"><span class="note" style="min-width:96px;text-align:right">'+dt.toLocaleDateString()+' '+(dt.toTimeString().slice(0,5))+'</span><button class="ld primary" style="padding:3px 8px">Abrir</button><button class="rm danger" style="padding:3px 8px">✕</button>'; d.querySelector('.ld').onclick=()=>loadFromLibrary(it.id); d.querySelector('.rm').onclick=()=>deleteLib(it.id); d.querySelector('.lnm').onchange=e=>{ const a=libIndex(); const x=a.find(y=>y.id===it.id); if(x){ x.name=e.target.value; libSaveIndex(a); toast('Renomeado.'); } }; w.appendChild(d); }); }
+function backupAll(){ const dump={v:1,when:Date.now(),lib:libIndex(),projects:{}}; libIndex().forEach(it=>{ dump.projects[it.id]=localStorage.getItem('gs_p_'+it.id); }); try{ dump.current=localStorage.getItem('game_proj'); }catch(e){} const b=new Blob([JSON.stringify(dump)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='amazonia-backup.json'; a.click(); toast('Backup de tudo baixado.'); }
+function restoreBackup(obj){ if(!obj||!obj.lib){ toast('Arquivo de backup inválido.'); return; } confirmDialog('Restaurar '+obj.lib.length+' jogo(s) do backup? Eles serão adicionados aos atuais.').then(ok=>{ if(!ok)return; const idx=libIndex(); (obj.lib||[]).forEach(it=>{ const data=obj.projects&&obj.projects[it.id]; if(data && _lsSet('gs_p_'+it.id, data)){ if(!idx.find(x=>x.id===it.id)) idx.unshift({id:it.id,name:it.name,updated:it.updated||Date.now()}); } }); libSaveIndex(idx); renderLibList(); toast('Backup restaurado.'); }); }
 /* ============ EXPORTAR JOGO (HTML jogável) ============ */
 function buildExportHTML(){
   const scene=exportScene();
@@ -1558,6 +1571,12 @@ function wire(){ buildTools(); setTool('select');
   if(g('tglRight'))g('tglRight').onclick=()=>togglePanel('right');
   if(g('panelBackdrop'))g('panelBackdrop').onclick=closePanels;
   wireMenus();
+  if(g('btnLocal'))g('btnLocal').onclick=()=>{ renderLibList(); g('localName').value=PR.name||''; g('localModal').classList.add('open'); };
+  if(g('localClose'))g('localClose').onclick=()=>g('localModal').classList.remove('open');
+  if(g('localSave'))g('localSave').onclick=saveToLibrary;
+  if(g('localBackup'))g('localBackup').onclick=backupAll;
+  if(g('localRestore'))g('localRestore').onclick=()=>g('localRestoreFile').click();
+  if(g('localRestoreFile'))g('localRestoreFile').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{ restoreBackup(JSON.parse(r.result)); }catch(x){ toast('Backup inválido.'); } }; r.readAsText(f); e.target.value=''; };
   if(g('confirmYes'))g('confirmYes').onclick=()=>{ g('confirmModal').classList.remove('open'); if(_confirmCb){_confirmCb(true);_confirmCb=null;} };
   if(g('confirmNo'))g('confirmNo').onclick=()=>{ g('confirmModal').classList.remove('open'); if(_confirmCb){_confirmCb(false);_confirmCb=null;} };
   const _wflag=()=>{ try{localStorage.setItem('gs_welcomed','1');}catch(e){} };
@@ -1591,6 +1610,16 @@ boot();
     <div class="auth-logo" style="font-size:1.05em">Confirmar</div>
     <p class="note" id="confirmMsg" style="font-size:13px;color:#dff3e6"></p>
     <div class="row" style="justify-content:flex-end;gap:8px;margin-top:4px"><button id="confirmNo">Cancelar</button><button class="primary" id="confirmYes">Confirmar</button></div>
+  </div>
+</div>
+<div id="localModal" class="modal">
+  <div class="auth-card" style="width:540px;max-width:95%;max-height:90%;overflow:auto;gap:8px">
+    <div class="row" style="justify-content:space-between"><div class="auth-logo" style="margin:0;font-size:1.05em">🗂️ Meus jogos (neste navegador)</div><button id="localClose">fechar</button></div>
+    <p class="note" id="localUse"></p>
+    <div class="row"><input id="localName" placeholder="nome do jogo" style="flex:1"><button class="primary" id="localSave">💾 Salvar cópia</button></div>
+    <div id="localList" style="display:flex;flex-direction:column;gap:6px"></div>
+    <div class="row" style="justify-content:space-between;margin-top:6px;border-top:1px solid var(--line);padding-top:8px"><button id="localBackup">⬇ Backup de tudo</button><button id="localRestore">⬆ Restaurar backup</button><input type="file" id="localRestoreFile" accept=".json" class="hide"></div>
+    <p class="note">O Backup salva TODOS os seus jogos locais num arquivo .json. Guarde-o para nunca perder seu trabalho.</p>
   </div>
 </div>
 <div id="welcomeModal" class="modal">
