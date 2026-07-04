@@ -113,6 +113,7 @@
     <button onclick="App.saveJSON()">.json</button>
     <button onclick="document.getElementById('fileIn').click()">Abrir</button>
     <input type="file" id="fileIn" accept=".json" class="hide" onchange="App.openJSON(event)">
+    <button onclick="Auth.showLogin()" title="Entrar na nuvem">☁ Entrar</button>
     <button id="logoutBtn" class="hide" onclick="Auth.logout()">Sair</button>
   </header>
 
@@ -320,14 +321,14 @@ function dl(url,name){ const a=document.createElement('a'); a.href=url; a.downlo
 
 /* ============ Auth + Cloud (Firebase) ============ */
 const Auth={ auth:null,
-  init(){ const cfg=this.cfg(); if(cfg && typeof firebase!=='undefined'){ try{ if(!firebase.apps.length) firebase.initializeApp(cfg); this.auth=firebase.auth(); this.auth.onAuthStateChanged(u=>{ if(u) this.enter(u); else this.showLogin(); }); return; }catch(e){} } if(localStorage.getItem('px_skip')) this.enter({email:'modo local'}); else this.showLogin(); },
+  init(){ const cfg=this.cfg(); if(cfg && typeof firebase!=='undefined'){ try{ if(!firebase.apps.length) firebase.initializeApp(cfg); this.auth=firebase.auth(); this.auth.onAuthStateChanged(u=>{ if(u) this.enter(u); else this.enter({email:'modo local'}); }); return; }catch(e){} } this.enter({email:'modo local'}); },
   cfg(){ return DEFAULT_FB_CONFIG; },
   showLogin(){ g('authgate').style.display='flex'; },
   enter(u){ g('authgate').style.display='none'; const ub=g('userBox'); if(ub){ ub.textContent=(u&&u.email)||'logado'; ub.classList.remove('hide'); } ['logoutBtn','cloudSaveBtn','profileBtn'].forEach(id=>{const b=g(id);if(b)b.classList.remove('hide');}); if(typeof Cloud!=='undefined') Cloud.ready(u); },
   login(){ if(!this.auth){ this.msg('Sem conexão.'); return; } this.auth.signInWithEmailAndPassword(g('au-email').value.trim(), g('au-pass').value).catch(e=>this.msg(e.message)); },
   signup(){ if(!this.auth){ this.msg('Sem conexão.'); return; } this.auth.createUserWithEmailAndPassword(g('au-email').value.trim(), g('au-pass').value).then(()=>this.msg('Conta criada!')).catch(e=>this.msg(e.message)); },
   skip(){ localStorage.setItem('px_skip','1'); this.enter({email:'modo local'}); },
-  logout(){ localStorage.removeItem('px_skip'); if(this.auth) this.auth.signOut(); else this.showLogin(); },
+  logout(){ localStorage.removeItem('px_skip'); if(this.auth) this.auth.signOut(); this.enter({email:'modo local'}); try{toast('Você saiu — modo local.');}catch(e){} },
   msg(t){ const m=g('auth-msg'); if(m) m.textContent=t; } };
 const Cloud={ db:null, uid:null,
   ready(u){ this.db=null; this.uid=null; if(u&&u.uid&&typeof firebase!=='undefined'&&firebase.firestore){ try{ this.db=firebase.firestore(); this.uid=u.uid; }catch(e){} } },

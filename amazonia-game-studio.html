@@ -349,6 +349,7 @@ if(this.enemies().length===0) this.win();"></textarea>
       <button id="btnNew">🆕 Novo projeto</button>
       <button id="btnOpenJson">📂 Abrir .json</button>
       <button id="btnLocal">🗂️ Meus jogos (backup)</button>
+      <button id="btnLoginOpen">☁ Entrar (nuvem)</button>
       <button id="btnExportJson">💾 Exportar .json</button>
       <button id="btnExportGame">⬇ Exportar jogo (HTML)</button>
       <button id="btnExportApp">📦 Exportar app</button>
@@ -1088,11 +1089,12 @@ function importArt(p,name){ if(!p){ logMsg('Arquivo não parece uma pixel art.')
 /* ============ FIREBASE ============ */
 let db=null,user=null,fbOk=false;
 function initFB(){ try{ firebase.initializeApp(FB); db=firebase.firestore(); fbOk=true; firebase.auth().onAuthStateChanged(u=>{ user=u; afterAuth(); }); }catch(e){ console.warn(e); g('auth-msg').textContent='Firebase indisponível — use "sem login".'; } }
-function afterAuth(){ if(user){ g('authgate').style.display='none'; g('userBox').textContent=user.email||'logado'; ['userBox','cloudBtn','profileBtn','logoutBtn'].forEach(i=>g(i).classList.remove('hide')); } }
+function afterAuth(){ if(user){ g('authgate').style.display='none'; g('userBox').textContent=user.email||'logado'; ['userBox','cloudBtn','profileBtn','logoutBtn'].forEach(i=>g(i).classList.remove('hide')); try{localStorage.setItem('gs_authmode','cloud');}catch(e){} } }
+function openLogin(){ g('authgate').style.display='flex'; if(g('auth-msg'))g('auth-msg').textContent=''; }
 function login(){ if(!fbOk)return; firebase.auth().signInWithEmailAndPassword(g('au-email').value,g('au-pass').value).catch(e=>g('auth-msg').textContent=e.message); }
 function signup(){ if(!fbOk)return; firebase.auth().createUserWithEmailAndPassword(g('au-email').value,g('au-pass').value).catch(e=>g('auth-msg').textContent=e.message); }
-function logout(){ if(fbOk)firebase.auth().signOut(); ['userBox','cloudBtn','profileBtn','logoutBtn'].forEach(i=>g(i).classList.add('hide')); g('authgate').style.display='flex'; }
-function skip(){ g('authgate').style.display='none'; }
+function logout(){ if(fbOk)firebase.auth().signOut(); ['userBox','cloudBtn','profileBtn','logoutBtn'].forEach(i=>g(i).classList.add('hide')); g('authgate').style.display='none'; try{localStorage.setItem('gs_authmode','guest');}catch(e){} try{toast('Você saiu — usando modo local (convidado).');}catch(e){} }
+function skip(){ g('authgate').style.display='none'; try{localStorage.setItem('gs_authmode','guest');}catch(e){} }
 function cloudSave(){ if(!user){ logMsg('Entre na conta para salvar na nuvem.'); return; } const data=serializeProject(); db.collection('gameprojects').add({uid:user.uid,name:data.name,data:data,ts:Date.now()}).then(()=>{ g('prof-msg').textContent='Projeto salvo na nuvem!'; logMsg('☁ Projeto salvo na nuvem.'); }).catch(e=>{ g('prof-msg').textContent=e.message; logMsg('Erro ao salvar: '+e.message); }); }
 function listScenes(){ const w=g('prof-scenes'); if(!user){w.innerHTML='<p class="note">Entre para ver.</p>';return;} w.innerHTML='<p class="note">carregando...</p>'; db.collection('gameprojects').where('uid','==',user.uid).get().then(s=>{ if(s.empty){w.innerHTML='<p class="note">Nenhum jogo salvo.</p>';return;} w.innerHTML=''; const arr=[]; s.forEach(d=>arr.push({id:d.id,...d.data()})); arr.sort((a,b)=>(b.ts||0)-(a.ts||0)); arr.forEach(it=>{ const d=document.createElement('div'); d.className='asset'; d.innerHTML='<div class="nm">'+esc(it.name||'jogo')+'</div>'; const b=document.createElement('button'); b.textContent='abrir'; b.onclick=()=>{ loadProject(it.data); g('profile').classList.remove('open'); logMsg('Projeto "'+(it.name||'')+'" carregado.'); }; d.appendChild(b); w.appendChild(d); }); }).catch(e=>w.innerHTML='<p class="note">'+esc(e.message)+'</p>'); }
 function listArts(){ const w=g('artsList'); if(!user){w.innerHTML='<p class="note">Entre na conta para ver suas artes.</p>';return;} w.innerHTML='<p class="note">carregando...</p>'; db.collection('pixelart').where('uid','==',user.uid).get().then(s=>{ if(s.empty){w.innerHTML='<p class="note">Nenhuma arte na nuvem. Salve no Pixel Studio.</p>';return;} w.innerHTML=''; s.forEach(doc=>{ const it=doc.data(); const p=projFromAny(it); const d=document.createElement('div'); d.className='asset'; d.innerHTML='<div class="nm">'+esc((it.name)||'art')+'</div>'; const b=document.createElement('button'); b.textContent='+ usar'; b.onclick=()=>{ importArt(p,it.name); }; d.appendChild(b); w.appendChild(d); }); }).catch(e=>w.innerHTML='<p class="note">'+esc(e.message)+'</p>'); }
@@ -1517,7 +1519,7 @@ function redo(){ if(HI<HIST.length-1){ HI++; applyHist(); logMsg('↷ Refeito.')
 
 /* ============ BOOT ============ */
 function wire(){ buildTools(); setTool('select');
-  g('btnLogin').onclick=login; g('btnSignup').onclick=signup; g('btnSkip').onclick=skip; g('logoutBtn').onclick=logout;
+  g('btnLogin').onclick=login; g('btnSignup').onclick=signup; g('btnSkip').onclick=skip; g('logoutBtn').onclick=logout; if(g('btnLoginOpen'))g('btnLoginOpen').onclick=openLogin;
   g('btnPlay').onclick=startPlay; g('btnStop').onclick=stopPlay;
   g('profileBtn').onclick=()=>{ g('prof-email').textContent=user?user.email:''; g('profile').classList.add('open'); listScenes(); };
   g('profClose').onclick=()=>g('profile').classList.remove('open'); g('profSave').onclick=cloudSave; g('cloudBtn').onclick=cloudSave;
@@ -1605,7 +1607,7 @@ function wire(){ buildTools(); setTool('select');
   window.addEventListener('message',e=>{ const d=e.data; if(d&&d.type==='amz_project'){ const p=projFromAny(d.data); if(p){ importArt(p,(d.data&&d.data.name)||'arte'); closeArtEditor(); } else logMsg('Arte recebida vazia.'); } if(d&&d.type==='amz_3dimage'){ convert3D(d.data); close3D(); } });
   document.addEventListener('keydown',e=>{ if(RUN)return; if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return; if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){ e.preventDefault(); if(e.shiftKey)redo(); else undo(); return; } if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){ e.preventDefault(); redo(); return; } if(e.key==='Delete'&&sel){ SC.entities=SC.entities.filter(z=>z!==sel); select(null); touch(); } });
 }
-function boot(){ wire(); initFB();
+function boot(){ wire(); initFB(); g('authgate').style.display='none';
   let loaded=false; try{ const r=localStorage.getItem('game_proj'); if(r){ loadProject(JSON.parse(r)); loaded=true; } }catch(e){}
   if(!loaded){ syncSceneInputs(); renderAssets(); renderLayers(); renderScenes(); resetHistory(); }
   resize(); logMsg('Bem-vindo ao Game Studio! 1) Importe suas artes  2) Pinte plataformas  3) Coloque objetos  4) Dê um comportamento de Player  5) ▶ Jogar.');

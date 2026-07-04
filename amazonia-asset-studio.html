@@ -178,6 +178,7 @@
     <span id="userBox" class="hide" style="font-size:11px;color:var(--muted)"></span>
     <button id="cloudSaveBtn" class="hide" onclick="Cloud.save()">☁ Salvar</button>
     <button id="profileBtn" class="hide" onclick="Profile.open()">Perfil</button>
+    <button onclick="Auth.showLogin()" title="Entrar na nuvem">☁ Entrar</button>
     <button id="logoutBtn" class="hide" onclick="Auth.logout()">Sair</button>
     <button onclick="App.newProject()">Novo</button>
     <button onclick="App.saveJSON()">Salvar .json</button>
@@ -1998,11 +1999,10 @@ const Auth = {
     const cfg=this.getConfig();
     if(cfg && typeof firebase!=='undefined'){
       try{ if(!firebase.apps.length) firebase.initializeApp(cfg); this.auth=firebase.auth();
-        this.auth.onAuthStateChanged(u=>{ if(u) this.enter(u); else this.showLogin(); }); return;
-      }catch(e){ this.showSetup('Config inválida: '+e.message); return; }
+        this.auth.onAuthStateChanged(u=>{ if(u) this.enter(u); else this.enter({email:'modo local'}); }); return;
+      }catch(e){ this.enter({email:'modo local'}); return; }
     }
-    if(localStorage.getItem('aas_skip')){ this.enter({email:'modo local'}); return; }
-    this.showSetup(cfg && typeof firebase==='undefined' ? 'Firebase não carregou (sem internet?). Você pode usar sem login.' : null);
+    this.enter({email:'modo local'});
   },
   saveConfig(){ let cfg; try{ cfg=this.parseCfg(g('fb-config').value); }catch(e){ this.setupMsg(e.message); return; }
     localStorage.setItem('aas_fb', JSON.stringify(cfg)); localStorage.removeItem('aas_skip'); location.reload(); },
@@ -2010,7 +2010,7 @@ const Auth = {
   login(){ if(!this.auth){ this.msg('Configure o Firebase primeiro.'); return; } this.auth.signInWithEmailAndPassword(g('au-email').value.trim(), g('au-pass').value).catch(e=>this.msg(e.message)); },
   signup(){ if(!this.auth){ this.msg('Configure o Firebase primeiro.'); return; } this.auth.createUserWithEmailAndPassword(g('au-email').value.trim(), g('au-pass').value).then(()=>this.msg('Conta criada!')).catch(e=>this.msg(e.message)); },
   google(){ if(!this.auth){ this.msg('Configure o Firebase primeiro.'); return; } const p=new firebase.auth.GoogleAuthProvider(); this.auth.signInWithPopup(p).catch(e=>this.msg(e.message)); },
-  logout(){ localStorage.removeItem('aas_skip'); if(this.auth) this.auth.signOut(); else this.showLogin(); },
+  logout(){ localStorage.removeItem('aas_skip'); if(this.auth) this.auth.signOut(); this.enter({email:'modo local'}); try{toast('Você saiu — modo local.');}catch(e){} },
   enter(u){ g('authgate').style.display='none'; const ub=g('userBox'); if(ub){ ub.textContent=(u&&u.email)||'logado'; ub.classList.remove('hide'); }
     ['logoutBtn','cloudSaveBtn','profileBtn'].forEach(id=>{ const b=g(id); if(b) b.classList.remove('hide'); });
     if(typeof Cloud!=='undefined') Cloud.ready(u); },
