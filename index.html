@@ -1877,7 +1877,7 @@ function boot(){ wire(); initFB(); g('authgate').style.display='none';
   resize(); logMsg('Bem-vindo ao Game Studio! 1) Importe suas artes  2) Pinte plataformas  3) Coloque objetos  4) Dê um comportamento de Player  5) ▶ Jogar.');
   if(!loaded){ try{ if(!localStorage.getItem('gs_welcomed')) g('welcomeModal').classList.add('open'); }catch(e){} }
 }
-boot();
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',boot);}else{boot();}
 </script>
 <div id="panelBackdrop"></div>
 <div id="toast"></div>
