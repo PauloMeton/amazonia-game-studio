@@ -468,7 +468,7 @@ function buildAsset(raw,name,id){ const w=raw.w||32,h=raw.h||32; let clips=(raw.
   const a={ id:id||('a'+uid()), name:name||raw.name||'art', w:w, h:h, raw:{w:w,h:h,clips:clips}, clips:{}, clipNames:[] };
   for(const cn in clips){ a.clipNames.push(cn); const arr=clips[cn]||[]; const out=[]; for(let i=0;i<arr.length;i++) out.push(frameCanvas(arr[i],w,h)); if(!out.length)out.push(frameCanvas(null,w,h)); a.clips[cn]=out; }
   a.bbox=computeBBox(clips,w,h); return a; }
-function assetById(id){ return PR.assets.find(a=>a.id===id); }
+function assetById(id){ var _p=(typeof PR!=='undefined'&&PR&&PR.assets)?PR.assets:((typeof SC!=='undefined'&&SC&&SC.assets)?SC.assets:[]); return _p.find(a=>a.id===id); }
 function clipScore(a,name){ const fs=a.raw.clips[name]||[]; let ne=0; for(const fr of fs){ if(fr&&fr.some(x=>x))ne++; } return fs.length?ne/fs.length:0; }
 function pickDefaultClip(a){ const pref=['idle','parado','idle-parado','linha-1']; for(const p of pref){ if(a.clips[p]&&clipScore(a,p)>0.3)return p; } let best=a.clipNames[0],bs=-1; for(const n of a.clipNames){ const s=clipScore(a,n); if(s>bs){bs=s;best=n;} } return best; }
 function addAsset(raw,name){ const a=buildAsset(raw,name); PR.assets.push(a); renderAssets(); touch(); return a; }
@@ -934,6 +934,7 @@ function ruleRun(e, a){ if(!a||!a.id)return;
     case 'criarNoPlayer': if(RUN.player&&assetById(a.asset))spawnRT({asset:a.asset,x:RUN.player.x,y:RUN.player.y,behaviors:[]}); break;
     case 'criarXY': if(assetById(a.asset))spawnRT({asset:a.asset,x:(+a.x||0),y:(+a.y||0),behaviors:[]}); break;
     case 'criarAleatorio': if(assetById(a.asset)){ const gx=cam.x+Math.random()*(cv.width/cam.z); spawnRT({asset:a.asset,x:gx,y:cam.y+20,behaviors:[]}); } break;
+    case 'criarPro':{ const n=Math.max(1,Math.min(30,+a.qtd||1)); const pool=(function(){ var pp=(typeof PR!=='undefined'&&PR&&PR.assets)?PR.assets:((typeof SC!=='undefined'&&SC&&SC.assets)?SC.assets:[]); return pp.filter(x=>x&&x.id!=='bala'); })(); const raio=+a.raio||180; const onde=a.onde||'aqui'; const vw=cv.width/cam.z, vh=cv.height/cam.z; const pl=RUN.player; for(let k=0;k<n;k++){ let id=a.item; if(id==='*rand*'||id==null){ if(!pool.length)break; id=pool[(Math.random()*pool.length)|0].id; } if(!assetById(id))continue; let px,py; if(onde==='player'){ px=pl?pl.x:cam.x+vw/2; py=pl?pl.y:cam.y+vh/2; } else if(onde==='pertoPlayer'){ const bx=pl?pl.x:cam.x+vw/2, by=pl?pl.y:cam.y+vh/2; px=bx+(Math.random()*2-1)*raio; py=by+(Math.random()*2-1)*raio; } else if(onde==='longePlayer'){ const near=pl?((pl.x-cam.x)<vw/2):false; px=cam.x+(near?vw-30:30); py=cam.y+Math.random()*vh; } else if(onde==='topo'){ px=cam.x+Math.random()*vw; py=cam.y+20; } else if(onde==='tela'){ px=cam.x+Math.random()*vw; py=cam.y+Math.random()*vh; } else if(onde==='xy'){ px=+a.x||0; py=+a.y||0; } else { px=e?e.x+e.w/2:cam.x+vw/2; py=e?e.y+e.h/2:cam.y+40; } spawnRT({asset:id,x:px,y:py,behaviors:[]}); } break; }
     case 'som': playSnd(a.tipo||'moeda'); break;
     case 'placarMais': RUN.score=(RUN.score||0)+(+a.n||1); break;
     case 'placarMenos': RUN.score=(RUN.score||0)-(+a.n||1); break;
@@ -1049,6 +1050,7 @@ const RULE_ACTS=[
  {id:'criarNoPlayer',label:'criar objeto no player',scope:'both',fields:[{k:'asset',t:'asset',def:''}]},
  {id:'criarXY',label:'criar objeto em (x,y)',scope:'both',fields:[{k:'asset',t:'asset',def:''},{k:'x',t:'num',def:0,label:'x'},{k:'y',t:'num',def:0,label:'y'}]},
  {id:'criarAleatorio',label:'criar objeto do alto (aleatório)',scope:'both',fields:[{k:'asset',t:'asset',def:''}]},
+ {id:'criarPro',label:'\uD83C\uDFB2 invocar objeto (item + local)',scope:'both',fields:[{k:'item',t:'itemR',def:'*rand*'},{k:'onde',t:'sel',def:'aqui',opts:[['aqui','aqui'],['player','no player'],['pertoPlayer','perto do player'],['longePlayer','longe do player'],['topo','cai do topo'],['tela','aleat. na tela'],['xy','em (x,y)']]},{k:'x',t:'num',def:0,label:'x'},{k:'y',t:'num',def:0,label:'y'},{k:'raio',t:'num',def:180,label:'raio'},{k:'qtd',t:'num',def:1,label:'qtd'}]},
  {id:'som',label:'tocar som',scope:'both',fields:[{k:'tipo',t:'sound',def:'moeda'}]},
  {id:'placarMais',label:'somar ao placar',scope:'both',fields:[{k:'n',t:'num',def:1}]},
  {id:'placarMenos',label:'tirar do placar',scope:'both',fields:[{k:'n',t:'num',def:1}]},
@@ -1076,7 +1078,7 @@ function _rfield(def, part, ctx){ const wrap=document.createElement('span'); wra
   let inp;
   if(def.t==='num'){ inp=document.createElement('input'); inp.type='number'; inp.step='any'; inp.style.width='60px'; if(part[def.k]==null)part[def.k]=def.def; inp.value=part[def.k]; }
   else if(def.t==='text'||def.t==='nome'){ inp=document.createElement('input'); inp.style.width='90px'; if(part[def.k]==null)part[def.k]=def.def||''; inp.value=part[def.k]; }
-  else { inp=document.createElement('select'); let opts=[]; if(def.t==='key')opts=RKEYS; else if(def.t==='dir')opts=RDIRS; else if(def.t==='sound')opts=RSOUNDS; else if(def.t==='clip')opts=(ctx.clips||[]).map(c=>[c,c]); else if(def.t==='asset')opts=(ctx.assets||[]).map(a=>[a.id,a.name]); else if(def.t==='sel')opts=def.opts||[];
+  else { inp=document.createElement('select'); let opts=[]; if(def.t==='key')opts=RKEYS; else if(def.t==='dir')opts=RDIRS; else if(def.t==='sound')opts=RSOUNDS; else if(def.t==='clip')opts=(ctx.clips||[]).map(c=>[c,c]); else if(def.t==='asset')opts=(ctx.assets||[]).map(a=>[a.id,a.name]); else if(def.t==='itemR')opts=[['*rand*','\uD83C\uDFB2 aleat\u00f3rio']].concat((ctx.assets||[]).map(a=>[a.id,a.name])); else if(def.t==='sel')opts=def.opts||[];
     if(part[def.k]==null)part[def.k]=(def.def!=null?def.def:(opts[0]?opts[0][0]:''));
     inp.innerHTML=opts.map(o=>'<option value="'+esc(o[0])+'"'+(String(part[def.k])===String(o[0])?' selected':'')+'>'+esc(o[1])+'</option>').join(''); }
   inp.style.fontSize='11px'; inp.style.padding='2px 4px';
