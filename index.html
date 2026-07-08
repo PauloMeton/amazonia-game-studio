@@ -568,7 +568,7 @@ function drawEntity(e){ const a=assetById(e.asset); if(!a)return; const clip=a.c
   const fi=RUN?(Math.floor(e._t*(e.fps||10))%clip.length):0; const fr=clip[fi]; if(!fr||!fr.width)return; const scx=SXof(e)*cam.z, scy=SYof(e)*cam.z;
   let dx,dy; if(RUN){ dx=(e.x+e.w/2)-(a.bbox.x+a.bbox.w/2)*SXof(e); dy=(e.y+e.h)-(a.bbox.y+a.bbox.h)*SYof(e); } else { dx=e.x; dy=e.y; }
   const p=w2s(dx,dy); cx.save(); cx.translate(p[0],p[1]); cx.imageSmoothingEnabled=false;
-  let _ef=e.flip; if(RUN){ if(e.faceMode==='lock')_ef=e._flip0; else if(e.faceMode==='left')_ef=!e.flip; } if(_ef){ cx.translate(a.w*scx,0); cx.scale(-1,1); }
+  let _ef=e.flip; if(e.faceMode==='left'){ _ef=RUN?!e.flip:false; } else if(RUN&&e.faceMode==='lock'){ _ef=e._flip0; } if(_ef){ cx.translate(a.w*scx,0); cx.scale(-1,1); }
   cx.drawImage(fr,0,0,a.w*scx,a.h*scy); cx.restore(); }
 /* ============ INPUT ============ */
 const Input={ get left(){return !!(Keys['ArrowLeft']||Keys['KeyA']);}, get right(){return !!(Keys['ArrowRight']||Keys['KeyD']);},
@@ -1118,7 +1118,7 @@ function nextSceneAction(){ const n=PR.cur+1; if(n<PR.scenes.length){ switchScen
 /* ============ PLAY / LOOP ============ */
 function startPlay(){ if(RUN)return; if(!SC.entities.length){ logMsg('Adicione ao menos um objeto e dê um comportamento de Player.'); }
   const ents=SC.entities.map(e=>{ const a=assetById(e.asset); const bb=a?a.bbox:{x:0,y:0,w:16,h:16};
-    const rt={ id:e.id,name:e.name,asset:e.asset,baseAsset:e.asset,clip:e.clip,fps:e.fps,sx:SXof(e),sy:SYof(e),flip:e.flip,faceMode:e.faceMode||'auto',_flip0:!!e.flip,
+    const rt={ id:e.id,name:e.name,asset:e.asset,baseAsset:e.asset,clip:e.clip,fps:e.fps,sx:SXof(e),sy:SYof(e),flip:(e.faceMode==='left'?true:e.flip),faceMode:e.faceMode||'auto',_flip0:!!e.flip,
       x:e.x+bb.x*SXof(e), y:e.y+bb.y*SYof(e), w:Math.max(2,bb.w*SXof(e)), h:Math.max(2,bb.h*SYof(e)),
       vx:0,vy:0,onGround:false,_t:0, behaviors:(e.behaviors||[]).map(b=>({type:b.type,params:Object.assign({},b.params)})), script:e.script||'', rules:(e.rules||[]), state:{}, dead:false };
     rt.startX=rt.x; rt.startY=rt.y;
@@ -1345,7 +1345,7 @@ function resize(){ cv.width=window.innerWidth; cv.height=window.innerHeight; } w
 window.addEventListener('keydown',e=>{ Keys[e.code]=true; if(RUN&&RUN.over&&e.code==='KeyR'){ location.reload(); return; } if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].indexOf(e.code)>=0)e.preventDefault(); });
 window.addEventListener('keyup',e=>{ Keys[e.code]=false; });
 const ents=SC.entities.map(e=>{ const a=assetById(e.asset); const bb=a?a.bbox:{x:0,y:0,w:16,h:16};
-  const rt={id:e.id,name:e.name,asset:e.asset,baseAsset:e.asset,clip:e.clip,fps:e.fps,sx:SXof(e),sy:SYof(e),flip:e.flip,layer:e.layer,faceMode:e.faceMode||'auto',_flip0:!!e.flip,
+  const rt={id:e.id,name:e.name,asset:e.asset,baseAsset:e.asset,clip:e.clip,fps:e.fps,sx:SXof(e),sy:SYof(e),flip:(e.faceMode==='left'?true:e.flip),layer:e.layer,faceMode:e.faceMode||'auto',_flip0:!!e.flip,
     x:e.x+bb.x*SXof(e),y:e.y+bb.y*SYof(e),w:Math.max(2,bb.w*SXof(e)),h:Math.max(2,bb.h*SYof(e)),
     vx:0,vy:0,onGround:false,_t:0,behaviors:(e.behaviors||[]).map(b=>({type:b.type,params:JSON.parse(JSON.stringify(b.params||{}))})),script:e.script||'',rules:(e.rules||[]),state:{},dead:false};
   rt.startX=rt.x; rt.startY=rt.y; if(rt.script.trim()){ try{ rt._fn=new Function('dt',rt.script);}catch(err){ rt._fn=null; } } return rt; });
