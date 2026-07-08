@@ -568,7 +568,7 @@ function drawEntity(e){ const a=assetById(e.asset); if(!a)return; const clip=a.c
   const fi=RUN?(Math.floor(e._t*(e.fps||10))%clip.length):0; const fr=clip[fi]; if(!fr||!fr.width)return; const scx=SXof(e)*cam.z, scy=SYof(e)*cam.z;
   let dx,dy; if(RUN){ dx=(e.x+e.w/2)-(a.bbox.x+a.bbox.w/2)*SXof(e); dy=(e.y+e.h)-(a.bbox.y+a.bbox.h)*SYof(e); } else { dx=e.x; dy=e.y; }
   const p=w2s(dx,dy); cx.save(); cx.translate(p[0],p[1]); cx.imageSmoothingEnabled=false;
-  if(e.flip){ cx.translate(a.w*scx,0); cx.scale(-1,1); }
+  let _ef=e.flip; if(RUN){ if(e.faceMode==='lock')_ef=e._flip0; else if(e.faceMode==='left')_ef=!e.flip; } if(_ef){ cx.translate(a.w*scx,0); cx.scale(-1,1); }
   cx.drawImage(fr,0,0,a.w*scx,a.h*scy); cx.restore(); }
 /* ============ INPUT ============ */
 const Input={ get left(){return !!(Keys['ArrowLeft']||Keys['KeyA']);}, get right(){return !!(Keys['ArrowRight']||Keys['KeyD']);},
@@ -1118,7 +1118,7 @@ function nextSceneAction(){ const n=PR.cur+1; if(n<PR.scenes.length){ switchScen
 /* ============ PLAY / LOOP ============ */
 function startPlay(){ if(RUN)return; if(!SC.entities.length){ logMsg('Adicione ao menos um objeto e dê um comportamento de Player.'); }
   const ents=SC.entities.map(e=>{ const a=assetById(e.asset); const bb=a?a.bbox:{x:0,y:0,w:16,h:16};
-    const rt={ id:e.id,name:e.name,asset:e.asset,baseAsset:e.asset,clip:e.clip,fps:e.fps,sx:SXof(e),sy:SYof(e),flip:e.flip,
+    const rt={ id:e.id,name:e.name,asset:e.asset,baseAsset:e.asset,clip:e.clip,fps:e.fps,sx:SXof(e),sy:SYof(e),flip:e.flip,faceMode:e.faceMode||'auto',_flip0:!!e.flip,
       x:e.x+bb.x*SXof(e), y:e.y+bb.y*SYof(e), w:Math.max(2,bb.w*SXof(e)), h:Math.max(2,bb.h*SYof(e)),
       vx:0,vy:0,onGround:false,_t:0, behaviors:(e.behaviors||[]).map(b=>({type:b.type,params:Object.assign({},b.params)})), script:e.script||'', rules:(e.rules||[]), state:{}, dead:false };
     rt.startX=rt.x; rt.startY=rt.y;
@@ -1232,6 +1232,7 @@ function refreshInspector(){ const w=g('insp'); if(!sel){ w.innerHTML='<p class=
   h+='<label style="margin-top:6px">Animação</label><select id="inClip">'+(a?a.clipNames.map(c=>'<option'+(c===sel.clip?' selected':'')+'>'+esc(c)+'</option>').join(''):'')+'</select>';
   if(a){ const _std=['idle','andar','pular']; const _miss=_std.filter(x=>a.clipNames.indexOf(x)<0); h+='<details style="margin-top:6px"><summary style="cursor:pointer;color:var(--accent2);font-size:11px">🎬 Animações desta arte ('+a.clipNames.length+')</summary><div style="margin-top:5px;display:flex;flex-direction:column;gap:4px">'+a.clipNames.map(c=>'<div class="row" style="gap:5px;align-items:center"><input class="clipRen" data-old="'+esc(c)+'" value="'+esc(c)+'" style="flex:1" title="renomear esta animação"><span class="note" style="font-size:10px;white-space:nowrap">'+a.clips[c].length+' quadro(s)</span></div>').join('')+'</div><p class="note" style="margin-top:5px;font-size:10px">Renomeie e aperte Enter. Padrões úteis: idle, andar, pular.'+(_miss.length?(' <span style="color:var(--danger)">Faltando: '+_miss.join(', ')+'</span>'):' <span style="color:var(--accent)">✓ todos presentes</span>')+'</p></details>'; }
   h+='<label class="row" style="margin-top:6px"><input type="checkbox" id="inFlip"'+(sel.flip?' checked':'')+'> espelhar</label>';
+  h+='<label style="margin-top:6px">Direção da arte (no jogo)</label><select id="inFace"><option value="auto"'+((sel.faceMode||'auto')==='auto'?' selected':'')+'>Espelhar ao andar (arte olha p/ direita)</option><option value="left"'+(sel.faceMode==='left'?' selected':'')+'>Arte olha p/ esquerda (não inverter)</option><option value="lock"'+(sel.faceMode==='lock'?' selected':'')+'>Nunca espelhar</option></select>';
   h+='<label style="margin-top:6px">Camada</label><select id="inLayer">'+SC.layers.map(L=>'<option value="'+L.id+'"'+((sel.layer||SC.active)===L.id?' selected':'')+'>'+esc(L.name)+'</option>').join('')+'</select>';
   h+='<h3 style="margin-top:10px;color:var(--accent2);font-size:11px;text-transform:uppercase">Comportamentos</h3><div id="behs"></div>';
   h+='<div class="row" style="margin-top:4px"><select id="behAdd"><option value="">+ adicionar...</option>'+Object.keys(BEH_DEF).map(k=>'<option value="'+k+'">'+BEH_DEF[k].label+'</option>').join('')+'</select></div>';
@@ -1250,7 +1251,7 @@ function refreshInspector(){ const w=g('insp'); if(!sel){ w.innerHTML='<p class=
   g('inSX').oninput=e=>{ const v=Math.max(.1,+e.target.value||1); sel.sx=v; delete sel.scale; if(g('inLockScale').checked){ sel.sy=v; g('inSY').value=v; } draw(); touch(); };
   g('inSY').oninput=e=>{ const v=Math.max(.1,+e.target.value||1); sel.sy=v; delete sel.scale; if(g('inLockScale').checked){ sel.sx=v; g('inSX').value=v; } draw(); touch(); };
   g('inFps').oninput=e=>{sel.fps=Math.max(1,+e.target.value||10);touch();};
-  g('inClip').onchange=e=>{sel.clip=e.target.value;draw();touch();}; g('inFlip').onchange=e=>{sel.flip=e.target.checked;draw();touch();}; g('inLayer').onchange=e=>{sel.layer=e.target.value;draw();touch();};
+  g('inClip').onchange=e=>{sel.clip=e.target.value;draw();touch();}; g('inFlip').onchange=e=>{sel.flip=e.target.checked;draw();touch();}; g('inFace').onchange=e=>{sel.faceMode=e.target.value;draw();touch();}; g('inLayer').onchange=e=>{sel.layer=e.target.value;draw();touch();};
   g('behAdd').onchange=e=>{ const tp=e.target.value; if(!tp)return; const params=JSON.parse(JSON.stringify(BEH_DEF[tp].params||{}));
     if(tp==='flow'){ const a=assetById(sel.asset); if(a){ params.nodes=a.clipNames.map((c,k)=>({id:'n'+k+'_'+uid(),clip:c,x:40+(k%4)*160,y:50+Math.floor(k/4)*90})); params.start=params.nodes[0]?params.nodes[0].id:''; } }
     sel.behaviors.push({type:tp,params:params}); refreshInspector(); touch(); };
@@ -1289,7 +1290,7 @@ function renderBehs(){ const w=g('behs'); if(!w)return; w.innerHTML=''; const a=
   w.querySelectorAll('.flowBtn').forEach(b=>b.onclick=()=>{ Flow.open(sel.behaviors[+b.dataset.i].params, assetById(sel.asset)); }); }
 
 /* ============ SALVAR / CARREGAR ============ */
-function stripEnt(e){ return {id:e.id,name:e.name,x:e.x,y:e.y,asset:e.asset,clip:e.clip,sx:SXof(e),sy:SYof(e),fps:e.fps,flip:e.flip,layer:e.layer,behaviors:e.behaviors,script:e.script,rules:e.rules||[]}; }
+function stripEnt(e){ return {id:e.id,name:e.name,x:e.x,y:e.y,asset:e.asset,clip:e.clip,sx:SXof(e),sy:SYof(e),fps:e.fps,flip:e.flip,faceMode:e.faceMode||'auto',layer:e.layer,behaviors:e.behaviors,script:e.script,rules:e.rules||[]}; }
 function sceneData(s){ return {name:s.name,mode:s.mode,tile:s.tile,gravity:s.gravity,bg:s.bg,tileColor:s.tileColor,bgImage:s.bgImage||'',bgW:s.bgW||0,bgH:s.bgH||0,bgLayers:(s.bgLayers||[]).map(L=>({url:L.url,w:L.w,h:L.h,parallax:L.parallax})),grid:s.grid,layers:s.layers,active:s.active,globalScript:s.globalScript||'',globalRules:(s.globalRules||[]),entities:(s.entities||[]).map(stripEnt)}; }
 function serializeProject(){ PR.name=g('projName').value; return {v:2,name:PR.name,cur:PR.cur,target:PR.target||'desktop',touchctl:PR.touchctl||'auto',camZoom:PR.camZoom||1,pvW:PR.pvW||0,pvPos:PR.pvPos||null,sound:PR.sound!==false,touchButtons:PR.touchButtons||defaultButtons(),assets:PR.assets.map(a=>({id:a.id,name:a.name,raw:a.raw})),scenes:PR.scenes.map(sceneData)}; }
 function exportScene(){ const o=sceneData(SC); o.assets=PR.assets.map(a=>({id:a.id,name:a.name,raw:a.raw})); o.name=SC.name; o.target=PR.target||'desktop'; o.touchctl=PR.touchctl||'auto'; o.touchButtons=PR.touchButtons||defaultButtons(); o.sound=PR.sound!==false; return o; }
@@ -1344,7 +1345,7 @@ function resize(){ cv.width=window.innerWidth; cv.height=window.innerHeight; } w
 window.addEventListener('keydown',e=>{ Keys[e.code]=true; if(RUN&&RUN.over&&e.code==='KeyR'){ location.reload(); return; } if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].indexOf(e.code)>=0)e.preventDefault(); });
 window.addEventListener('keyup',e=>{ Keys[e.code]=false; });
 const ents=SC.entities.map(e=>{ const a=assetById(e.asset); const bb=a?a.bbox:{x:0,y:0,w:16,h:16};
-  const rt={id:e.id,name:e.name,asset:e.asset,baseAsset:e.asset,clip:e.clip,fps:e.fps,sx:SXof(e),sy:SYof(e),flip:e.flip,layer:e.layer,
+  const rt={id:e.id,name:e.name,asset:e.asset,baseAsset:e.asset,clip:e.clip,fps:e.fps,sx:SXof(e),sy:SYof(e),flip:e.flip,layer:e.layer,faceMode:e.faceMode||'auto',_flip0:!!e.flip,
     x:e.x+bb.x*SXof(e),y:e.y+bb.y*SYof(e),w:Math.max(2,bb.w*SXof(e)),h:Math.max(2,bb.h*SYof(e)),
     vx:0,vy:0,onGround:false,_t:0,behaviors:(e.behaviors||[]).map(b=>({type:b.type,params:JSON.parse(JSON.stringify(b.params||{}))})),script:e.script||'',rules:(e.rules||[]),state:{},dead:false};
   rt.startX=rt.x; rt.startY=rt.y; if(rt.script.trim()){ try{ rt._fn=new Function('dt',rt.script);}catch(err){ rt._fn=null; } } return rt; });
