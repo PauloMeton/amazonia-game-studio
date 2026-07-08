@@ -1128,6 +1128,7 @@ function startPlay(){ if(RUN)return; if(!SC.entities.length){ logMsg('Adicione a
   if(SC.globalScript&&SC.globalScript.trim()){ try{ RUN._gfn=new Function('dt',SC.globalScript); }catch(err){ logMsg('⚠ Sintaxe no Script global: '+err.message); RUN._gfn=null; } }
   RUN.player=ents.find(e=>e.behaviors.some(b=>b.type==='player-platformer'||b.type==='player-topdown'))||null;
   if(!RUN.player) logMsg('Dica: nenhum objeto tem comportamento de Player. Selecione um objeto e adicione "Player Plataforma" ou "Player Top-down" para controlá-lo e a câmera segui-lo.');
+  if(SC.mode==='platformer' && RUN.player && (!SC.grid||Object.keys(SC.grid).length===0)) logMsg('⚠ Esta cena não tem chão — o player vai cair sem parar. Use a ferramenta "▦ Plataforma" para desenhar o chão embaixo dele.');
   g('btnPlay').classList.add('hide'); g('btnStop').classList.remove('hide');
   editZoom=cam.z; cam.z=PR.camZoom||1; try{ const _c=_ac(); if(_c&&_c.state==='suspended')_c.resume(); }catch(e){}
   if(shouldShowTouch())Touch.show(g('stage'));
