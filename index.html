@@ -417,7 +417,7 @@ if(this.enemies().length===0) this.win();"></textarea>
       <div class="card"><h3>Camadas (baixo → cima)</h3>
         <div id="layerList"></div>
         <button id="addLayer" style="width:100%;margin-top:6px">+ camada</button>
-        <p class="note" style="margin-top:4px">A camada destacada é a ativa (objetos novos vão nela). 👁 mostra/oculta.</p>
+        <p class="note" style="margin-top:4px">Nº menor fica atrás, nº maior fica na frente. A camada destacada é a ativa (objetos novos vão nela). 👁 mostra/oculta.</p>
       </div>
     </div>
 
@@ -1211,7 +1211,7 @@ function renderAssets(){ const w=g('assetList'); if(!PR.assets.length){ w.innerH
     d.appendChild(c); d.appendChild(nm); d.appendChild(x); d.onclick=()=>{ placeAsset=a.id; setTool('place'); renderAssets(); }; w.appendChild(d); }); }
 
 function renderLayers(){ const w=g('layerList'); if(!w)return; w.innerHTML=''; SC.layers.forEach((L,i)=>{ const d=document.createElement('div'); d.className='asset'+(SC.active===L.id?' sel':'');
-    d.innerHTML='<button data-v="'+i+'" title="visível" style="padding:2px 6px">'+(L.visible===false?'🚫':'👁')+'</button><input class="lnm" data-i="'+i+'" value="'+esc(L.name)+'" style="flex:1"><button data-u="'+i+'" style="padding:2px 5px">▲</button><button data-d="'+i+'" style="padding:2px 5px">▼</button><button data-x="'+i+'" class="danger" style="padding:2px 6px">✕</button>';
+    d.innerHTML='<span style="min-width:20px;text-align:center;font-weight:bold;color:var(--accent2);font-size:12px">'+(i+1)+'</span><button data-v="'+i+'" title="visível" style="padding:2px 6px">'+(L.visible===false?'🚫':'👁')+'</button><input class="lnm" data-i="'+i+'" value="'+esc(L.name)+'" style="flex:1"><button data-u="'+i+'" style="padding:2px 5px">▲</button><button data-d="'+i+'" style="padding:2px 5px">▼</button><button data-x="'+i+'" class="danger" style="padding:2px 6px">✕</button>';
     d.onclick=ev=>{ if(ev.target.tagName==='INPUT'||ev.target.tagName==='BUTTON')return; SC.active=L.id; renderLayers(); };
     w.appendChild(d); });
   w.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{ const L=SC.layers[+b.dataset.v]; L.visible=(L.visible===false); renderLayers(); draw(); touch(); });
@@ -1233,7 +1233,7 @@ function refreshInspector(){ const w=g('insp'); if(!sel){ w.innerHTML='<p class=
   if(a){ const _std=['idle','andar','pular']; const _miss=_std.filter(x=>a.clipNames.indexOf(x)<0); h+='<details style="margin-top:6px"><summary style="cursor:pointer;color:var(--accent2);font-size:11px">🎬 Animações desta arte ('+a.clipNames.length+')</summary><div style="margin-top:5px;display:flex;flex-direction:column;gap:4px">'+a.clipNames.map(c=>'<div class="row" style="gap:5px;align-items:center"><input class="clipRen" data-old="'+esc(c)+'" value="'+esc(c)+'" style="flex:1" title="renomear esta animação"><span class="note" style="font-size:10px;white-space:nowrap">'+a.clips[c].length+' quadro(s)</span></div>').join('')+'</div><p class="note" style="margin-top:5px;font-size:10px">Renomeie e aperte Enter. Padrões úteis: idle, andar, pular.'+(_miss.length?(' <span style="color:var(--danger)">Faltando: '+_miss.join(', ')+'</span>'):' <span style="color:var(--accent)">✓ todos presentes</span>')+'</p></details>'; }
   h+='<label class="row" style="margin-top:6px"><input type="checkbox" id="inFlip"'+(sel.flip?' checked':'')+'> espelhar</label>';
   h+='<label style="margin-top:6px">Direção da arte (no jogo)</label><select id="inFace"><option value="auto"'+((sel.faceMode||'auto')==='auto'?' selected':'')+'>Espelhar ao andar (arte olha p/ direita)</option><option value="left"'+(sel.faceMode==='left'?' selected':'')+'>Arte olha p/ esquerda (não inverter)</option><option value="lock"'+(sel.faceMode==='lock'?' selected':'')+'>Nunca espelhar</option></select>';
-  h+='<label style="margin-top:6px">Camada</label><select id="inLayer">'+SC.layers.map(L=>'<option value="'+L.id+'"'+((sel.layer||SC.active)===L.id?' selected':'')+'>'+esc(L.name)+'</option>').join('')+'</select>';
+  h+='<label style="margin-top:6px">Camada</label><select id="inLayer">'+SC.layers.map((L,i)=>'<option value="'+L.id+'"'+((sel.layer||SC.active)===L.id?' selected':'')+'>'+(i+1)+' · '+esc(L.name)+'</option>').join('')+'</select>';
   h+='<h3 style="margin-top:10px;color:var(--accent2);font-size:11px;text-transform:uppercase">Comportamentos</h3><div id="behs"></div>';
   h+='<div class="row" style="margin-top:4px"><select id="behAdd"><option value="">+ adicionar...</option>'+Object.keys(BEH_DEF).map(k=>'<option value="'+k+'">'+BEH_DEF[k].label+'</option>').join('')+'</select></div>';
   h+='<h3 style="margin-top:10px;color:var(--accent);font-size:11px;text-transform:uppercase">🧩 Regras — Quando → Faça (sem código)</h3><div id="inRules"></div>';
