@@ -448,7 +448,7 @@ const FB={ apiKey:"AIzaSyALwzr4Ur2X0ptWIjQJq57kVf62vCa0FIY", authDomain:"ia-asse
 const g=id=>document.getElementById(id);
 const uid=()=>Math.random().toString(36).slice(2,9);
 
-function newScene(){ return {name:'cena 1',mode:'platformer',tile:32,gravity:1800,bg:'#0a0f0c',tileColor:'#3a5d44',bgImage:'',bgW:0,bgH:0,bgLayers:[],grid:{},entities:[],layers:[{id:'L1',name:'Cenário',visible:true},{id:'L2',name:'Objetos',visible:true}],active:'L2',globalScript:'',globalRules:[]}; }
+function newScene(){ return {name:'cena 1',mode:'platformer',tile:32,gravity:1800,bg:'#0a0f0c',tileColor:'#3a5d44',bgImage:'',bgW:0,bgH:0,bgLayers:[],grid:(function(){var _g={};for(var _c=0;_c<30;_c++)_g[_c+',12']=1;return _g;})(),entities:[],layers:[{id:'L1',name:'Cenário',visible:true},{id:'L2',name:'Objetos',visible:true}],active:'L2',globalScript:'',globalRules:[]}; }
 function newProject(){ return {name:'meu-jogo',cur:0,target:'desktop',touchctl:'auto',camZoom:1,touchButtons:defaultButtons(),assets:[],scenes:[newScene()]}; }
 let PR=newProject();
 let SC=PR.scenes[0];
@@ -488,7 +488,7 @@ function renameClip(a,oldN,newN){ if(!a)return false; newN=(newN||'').trim(); if
 
 function SXof(e){ return e.sx!=null?e.sx:(e.scale!=null?e.scale:1); }
 function SYof(e){ return e.sy!=null?e.sy:(e.scale!=null?e.scale:1); }
-function addEntity(assetId,wx,wy){ const a=assetById(assetId); const e={ id:'e'+uid(), name:(a?a.name:'obj'), x:wx, y:wy, asset:assetId, clip:(a?pickDefaultClip(a):'default'), sx:2, sy:2, fps:10, flip:false, layer:(SC.active||(SC.layers[SC.layers.length-1]||{}).id), behaviors:[], script:'' }; SC.entities.push(e); touch(); return e; }
+function addEntity(assetId,wx,wy){ const a=assetById(assetId); const _sc=a?Math.min(2,Math.max(0.25,Math.round(((SC.tile*2.5)/a.h)*4)/4)):2; const e={ id:'e'+uid(), name:(a?a.name:'obj'), x:wx, y:wy, asset:assetId, clip:(a?pickDefaultClip(a):'default'), sx:_sc, sy:_sc, fps:10, flip:false, layer:(SC.active||(SC.layers[SC.layers.length-1]||{}).id), behaviors:[], script:'' }; SC.entities.push(e); touch(); return e; }
 
 /* ============ CÂMERA / DRAW ============ */
 const cv=g('game'); const cx=cv.getContext('2d');
@@ -1162,7 +1162,10 @@ function loop(now){ if(!RUN)return; const dt=Math.min(0.05,(now-RUN.last)/1000);
       if(RUN._gfn){ try{ RUN._gfn.call(gameApi(dt),dt); }catch(err){ logMsg('⚠ Script global: '+err.message); RUN._gfn=null; } }
       try{ runGlobalRules(dt); }catch(_e){}
     }
-    if(RUN.player){ cam.x=(RUN.player.x+RUN.player.w/2)-cv.width/(2*cam.z); cam.y=(RUN.player.y+RUN.player.h/2)-cv.height/(2*cam.z); }
+    if(RUN.player){ if(!RUN._bset){ RUN._bset=true; let mnx=Infinity,mny=Infinity,mxx=-Infinity,mxy=-Infinity,any=false; for(const k in SC.grid){ if(!SC.grid[k])continue; any=true; const pp=k.split(','),c=+pp[0],r=+pp[1]; if(c<mnx)mnx=c; if(c>mxx)mxx=c; if(r<mny)mny=r; if(r>mxy)mxy=r; } if(any){ const T=SC.tile,m=T*4; RUN._bounds={x:mnx*T-m,y:mny*T-m,w:(mxx-mnx+1)*T+2*m,h:(mxy-mny+1)*T+2*m}; } }
+      const _tx=(RUN.player.x+RUN.player.w/2)-cv.width/(2*cam.z), _ty=(RUN.player.y+RUN.player.h/2)-cv.height/(2*cam.z);
+      if(RUN._camInit){ cam.x+=(_tx-cam.x)*0.15; cam.y+=(_ty-cam.y)*0.15; } else { cam.x=_tx; cam.y=_ty; RUN._camInit=true; }
+      const _B=RUN._bounds; if(_B){ const vw=cv.width/cam.z, vh=cv.height/cam.z; if(_B.w>vw)cam.x=Math.max(_B.x,Math.min(cam.x,_B.x+_B.w-vw)); else cam.x=_B.x+(_B.w-vw)/2; if(_B.h>vh)cam.y=Math.max(_B.y,Math.min(cam.y,_B.y+_B.h-vh)); else cam.y=_B.y+(_B.h-vh)/2; } }
     let _sx=0,_sy=0; if(RUN._shake>0){ _sx=(Math.random()-0.5)*RUN._shake; _sy=(Math.random()-0.5)*RUN._shake; cam.x+=_sx; cam.y+=_sy; RUN._shake=Math.max(0,RUN._shake-0.6); }
     draw(); drawHUD2();
     if(_sx||_sy){ cam.x-=_sx; cam.y-=_sy; }
@@ -1367,7 +1370,14 @@ function exportSmokeTest(html){ return new Promise(res=>{ let done=false,err=nul
 
 /* ============ IMPORTAR ARTES ============ */
 function projFromAny(d){ const p=d&&(d.data||d.proj||d); if(p&&(p.frames||p.clips))return p; return null; }
-function importArt(p,name){ if(!p){ logMsg('Arquivo não parece uma pixel art.'); return; } addAsset(p,name||p.name); logMsg('Arte "'+(name||p.name||'art')+'" adicionada à biblioteca.'); }
+function importArt(p,name){ if(!p){ logMsg('Arquivo não parece uma pixel art.'); return; }
+  let nm=name||p.name||'arte'; const orig=nm; if(PR.assets.some(x=>x.name===nm)){ let k=2; while(PR.assets.some(x=>x.name===nm+' '+k))k++; nm=nm+' '+k; toast('Já existia "'+orig+'" — nova arte nomeada "'+nm+'".'); }
+  const a=addAsset(p,nm); logMsg('Arte "'+nm+'" adicionada à biblioteca.');
+  try{ const total=a.clipNames.reduce((t,c)=>t+a.clips[c].length,0); const std=['idle','andar','pular'];
+    if(a.clipNames.length===1 && total<=1) toast('⚠ "'+a.name+'" tem só 1 quadro — vai ficar parada (sem animação).');
+    else if(!a.clipNames.some(c=>std.indexOf(c)>=0)) toast('Dica: renomeie as animações para idle / andar / pular no Inspetor (🎬).');
+  }catch(_e){}
+  return a; }
 
 /* ============ FIREBASE ============ */
 let db=null,user=null,fbOk=false;
