@@ -672,10 +672,25 @@ const BEH_DEF={
   'cura':{label:'Cura o player ao tocar',params:{vida:1}},
   'checkpoint':{label:'Checkpoint (salva o retorno)',params:{}},
   'some-tempo':{label:'Some depois de … s',params:{seg:3}},
-  'voa-persegue':{label:'Inimigo voador (persegue)',params:{vida:3,velocidade:90}}
+  'voa-persegue':{label:'Inimigo voador (persegue)',params:{vida:3,velocidade:90}},
+  'chave':{label:'Chave (coletar) 🔑',params:{}},
+  'porta':{label:'Porta (abre com chaves)',params:{chaves:1}},
+  'botao':{label:'Botão/Interruptor',params:{}},
+  'bloco-pisca':{label:'Bloco que pisca (some/volta)',params:{seg:1.2}},
+  'boss':{label:'Chefe (boss)',params:{vida:20,velocidade:50,cadencia:1.5,velocidadeBala:260}},
+  'inimigo-pula':{label:'Inimigo: pula e anda',params:{vida:3,velocidade:60,distancia:120,forca:500,intervalo:1.5}},
+  'inimigo-dash':{label:'Inimigo: dá dash (investe)',params:{vida:3,velocidade:60,alcance:200,dash:400}},
+  'inimigo-invoca':{label:'Inimigo: invoca outros',params:{vida:5,intervalo:3,max:8}},
+  'powerup-velocidade':{label:'Power-up: velocidade',params:{seg:6,mult:1.8}},
+  'powerup-pulo':{label:'Power-up: super pulo',params:{seg:6,mult:1.5}},
+  'powerup-pontos':{label:'Power-up: pontos',params:{valor:5}},
+  'trampolim':{label:'Trampolim (arremessa)',params:{forca:780}},
+  'esteira':{label:'Esteira (empurra na horizontal)',params:{velocidade:80}},
+  'vento':{label:'Zona de vento',params:{forcaX:200,forcaY:0}},
+  'plataforma-cai':{label:'Plataforma que cai',params:{seg:0.6}}
 };
 const BEH={
-  'player-platformer':(e,p,dt)=>{ const sp=+p.speed||200, jp=+p.jump||560; e.vx=(Input.right?sp:0)-(Input.left?sp:0); e.vy+=SC.gravity*dt; if(Input.jump&&e.onGround){e.vy=-jp; playSnd('pulo');} moveE(e,dt);
+  'player-platformer':(e,p,dt)=>{ const _bs=(RUN._buffSpd&&RUN.t<RUN._buffSpd.until)?RUN._buffSpd.mul:1,_bj=(RUN._buffJmp&&RUN.t<RUN._buffJmp.until)?RUN._buffJmp.mul:1; const sp=(+p.speed||200)*_bs, jp=(+p.jump||560)*_bj; e.vx=(Input.right?sp:0)-(Input.left?sp:0); e.vy+=SC.gravity*dt; if(Input.jump&&e.onGround){e.vy=-jp; playSnd('pulo');} moveE(e,dt);
     if(e.vx<0)e.flip=true; else if(e.vx>0)e.flip=false; if(!hasAnimator(e))autoClip(e, !e.onGround?['pular','jump','idle']:(e.vx!==0?['correr','andar','andar-dir','walk']:['idle','parado'])); if(e.y>6000)respawn(e); },
   'player-topdown':(e,p,dt)=>{ const sp=+p.speed||160; let dx=(Input.right?1:0)-(Input.left?1:0), dy=(Input.down?1:0)-(Input.up?1:0); if(dx&&dy){dx*=Math.SQRT1_2;dy*=Math.SQRT1_2;} e.vx=dx*sp; e.vy=dy*sp; moveE(e,dt);
     let c; if(dy>0)c=['andar-baixo','andar','walk']; else if(dy<0)c=['andar-cima','andar','walk']; else if(dx>0){c=['andar-dir','andar','walk'];e.flip=false;} else if(dx<0){ if(hasClip(e,'andar-esq')){c=['andar-esq'];e.flip=false;}else{c=['andar-dir','andar','walk'];e.flip=true;} } else c=['idle','parado']; if(!hasAnimator(e))autoClip(e,c); },
@@ -722,7 +737,22 @@ const BEH={
   'cura':(e,p,dt)=>{ const pl=RUN.player; if(pl&&overlap(e,pl)){ if(pl.hp!=null)pl.hp+=(+p.vida||1); e.dead=true; playSnd('moeda'); } },
   'checkpoint':(e,p,dt)=>{ const pl=RUN.player; if(pl&&!e.state._done&&overlap(e,pl)){ e.state._done=true; pl.startX=e.x; pl.startY=e.y; playSnd('moeda'); RUN._hud='Checkpoint!'; } },
   'some-tempo':(e,p,dt)=>{ e.state._st=(e.state._st||0)+dt; if(e.state._st>=(+p.seg||3))e.dead=true; },
-  'voa-persegue':(e,p,dt)=>{ e.isEnemy=true; if(e.hp===undefined)e.hp=+p.vida||3; const pl=RUN.player,sp=+p.velocidade||90; if(pl){ const ddx=pl.x-e.x,ddy=pl.y-e.y,d=Math.hypot(ddx,ddy)||1; e.x+=ddx/d*sp*dt; e.y+=ddy/d*sp*dt; e.flip=ddx<0; if(overlap(e,pl)){ respawn(pl); playSnd('dano'); } } if(e.hp<=0){e.dead=true;RUN.score=(RUN.score||0)+1;playSnd('moeda');} if(!hasAnimator(e))autoClip(e,['andar','walk','idle','parado']); }
+  'voa-persegue':(e,p,dt)=>{ e.isEnemy=true; if(e.hp===undefined)e.hp=+p.vida||3; const pl=RUN.player,sp=+p.velocidade||90; if(pl){ const ddx=pl.x-e.x,ddy=pl.y-e.y,d=Math.hypot(ddx,ddy)||1; e.x+=ddx/d*sp*dt; e.y+=ddy/d*sp*dt; e.flip=ddx<0; if(overlap(e,pl)){ respawn(pl); playSnd('dano'); } } if(e.hp<=0){e.dead=true;RUN.score=(RUN.score||0)+1;playSnd('moeda');} if(!hasAnimator(e))autoClip(e,['andar','walk','idle','parado']); },
+  'chave':(e,p,dt)=>{ const pl=RUN.player; if(pl&&overlap(e,pl)){ RUN._gstate.chaves=(RUN._gstate.chaves||0)+1; e.dead=true; playSnd('moeda'); RUN._hud='Chaves: '+RUN._gstate.chaves; } },
+  'porta':(e,p,dt)=>{ if((RUN._gstate.chaves||0)>=(+p.chaves||1)){ e.dead=true; playSnd('moeda'); RUN._hud='Porta aberta!'; } else e._blink=0.3; },
+  'botao':(e,p,dt)=>{ const pl=RUN.player; if(pl&&overlap(e,pl)){ RUN._gstate[p.nome||'sw']=1; if(!e.state._b){e.state._b=1;playSnd('moeda');} } },
+  'bloco-pisca':(e,p,dt)=>{ e.state._pt=(e.state._pt||0)+dt; const per=+p.seg||1.2; e._hidden=(Math.floor(e.state._pt/per)%2)===1; },
+  'boss':(e,p,dt)=>{ e.isEnemy=true; if(e.hp===undefined)e.hp=+p.vida||20; const pl=RUN.player,sp=+p.velocidade||50; if(pl){ e.vx=Math.sign(pl.x-e.x)*sp; if(SC.mode==='platformer')e.vy+=SC.gravity*dt; else e.vy=Math.sign(pl.y-e.y)*sp; moveE(e,dt); e.flip=e.vx<0; e.state._cd=(e.state._cd||0)-dt; if(e.state._cd<=0){ e.state._cd=+p.cadencia||1.5; _shootAt(e,pl.x+pl.w/2,pl.y+pl.h/2,+p.velocidadeBala||260,'bad'); } if(overlap(e,pl)){ respawn(pl); playSnd('dano'); } } if(e.hp<=0){ e.dead=true; RUN.over='win'; playSnd('moeda'); } if(!hasAnimator(e))autoClip(e,['andar','walk','idle','parado']); },
+  'inimigo-pula':(e,p,dt)=>{ if(e.hp===undefined)e.hp=+p.vida||3; e.isEnemy=true; const sp=+p.velocidade||60; if(e.state._o===undefined){e.state._o=e.x;e.state._d=e.flip?-1:1;} e.vx=sp*e.state._d; if(SC.mode==='platformer'){ e.vy+=SC.gravity*dt; if(e.onGround){ e.state._jt=(e.state._jt||0)-dt; if(e.state._jt<=0){ e.vy=-(+p.forca||500); e.state._jt=+p.intervalo||1.5; } } } moveE(e,dt); if(Math.abs(e.x-e.state._o)>=(+p.distancia||120)){e.state._d*=-1;e.state._o=e.x;} e.flip=e.state._d<0; const pl=RUN.player; if(pl&&overlap(e,pl)){respawn(pl);playSnd('dano');} if(e.hp<=0){e.dead=true;RUN.score=(RUN.score||0)+1;playSnd('moeda');} if(!hasAnimator(e))autoClip(e,['pular','andar','idle']); },
+  'inimigo-dash':(e,p,dt)=>{ if(e.hp===undefined)e.hp=+p.vida||3; e.isEnemy=true; const pl=RUN.player,rng=+p.alcance||200; if(pl){ if(_nearP(e)<rng){ const dir=_toPlayer(e); e.vx=dir[0]*(+p.dash||400); if(SC.mode!=='platformer')e.vy=dir[1]*(+p.dash||400); else e.vy+=SC.gravity*dt; } else { e.vx*=0.9; if(SC.mode==='platformer')e.vy+=SC.gravity*dt; } moveE(e,dt); if(e.vx)e.flip=e.vx<0; if(overlap(e,pl)){respawn(pl);playSnd('dano');} } if(e.hp<=0){e.dead=true;RUN.score=(RUN.score||0)+1;playSnd('moeda');} if(!hasAnimator(e))autoClip(e,['andar','idle']); },
+  'inimigo-invoca':(e,p,dt)=>{ if(e.hp===undefined)e.hp=+p.vida||5; e.isEnemy=true; e.state._sc=(e.state._sc||0)-dt; if(e.state._sc<=0){ e.state._sc=+p.intervalo||3; if(RUN.ents.filter(z=>z.isEnemy&&!z.dead).length<(+p.max||8)){ const as=assetById('enemy')?'enemy':e.asset; spawnRT({asset:as,x:e.x,y:e.y,behaviors:[{type:'inimigo-persegue',params:{vida:2,velocidade:90}}]}); } } const pl=RUN.player; if(pl&&overlap(e,pl)){respawn(pl);playSnd('dano');} if(e.hp<=0){e.dead=true;RUN.score=(RUN.score||0)+2;playSnd('moeda');} },
+  'powerup-velocidade':(e,p,dt)=>{ const pl=RUN.player; if(pl&&overlap(e,pl)){ RUN._buffSpd={mul:+p.mult||1.8,until:RUN.t+(+p.seg||6)}; e.dead=true; playSnd('moeda'); RUN._hud='Velocidade!'; } },
+  'powerup-pulo':(e,p,dt)=>{ const pl=RUN.player; if(pl&&overlap(e,pl)){ RUN._buffJmp={mul:+p.mult||1.5,until:RUN.t+(+p.seg||6)}; e.dead=true; playSnd('moeda'); RUN._hud='Super pulo!'; } },
+  'powerup-pontos':(e,p,dt)=>{ const pl=RUN.player; if(pl&&overlap(e,pl)){ RUN.score=(RUN.score||0)+(+p.valor||5); e.dead=true; playSnd('moeda'); } },
+  'trampolim':(e,p,dt)=>{ const pl=RUN.player; if(pl&&pl.vy>0&&pl.x+pl.w>e.x&&pl.x<e.x+e.w&&Math.abs((pl.y+pl.h)-e.y)<=14){ pl.vy=-(+p.forca||780); playSnd('pulo'); } },
+  'esteira':(e,p,dt)=>{ const pl=RUN.player; if(pl&&pl.x+pl.w>e.x&&pl.x<e.x+e.w&&Math.abs((pl.y+pl.h)-e.y)<=10){ pl.x+=(+p.velocidade||80)*dt; } },
+  'vento':(e,p,dt)=>{ const pl=RUN.player; if(pl&&overlap(e,pl)){ pl.vx+=(+p.forcaX||0)*dt; pl.vy+=(+p.forcaY||0)*dt; } },
+  'plataforma-cai':(e,p,dt)=>{ if(e.state._fall){ e.vy+=SC.gravity*dt; e.y+=e.vy*dt; if(e.y>cam.y+cv.height/cam.z+200)e.dead=true; return; } const pl=RUN.player; if(pl&&pl.vy>=0&&pl.x+pl.w>e.x&&pl.x<e.x+e.w&&Math.abs((pl.y+pl.h)-e.y)<=8){ e.state._t2=(e.state._t2||0)+dt; if(e.state._t2>=(+p.seg||0.6)){ e.state._fall=true; e.vy=0; } } }
 };
 function hasAnimator(e){ return e.behaviors&&e.behaviors.some(b=>b.type==='animator'||b.type==='flow'); }
 function setNodeClip(e,p){ const n=p.nodes.find(x=>x.id===e.state._node); if(n&&hasClip(e,n.clip)&&e.clip!==n.clip){ e.clip=n.clip; e._t=0; } }
@@ -741,7 +771,7 @@ function clipDur(e,c){ const a=assetById(e.asset); const fs=a&&a.clips[c]; retur
 function clipDurAsset(assetId,clip,fps){ const a=assetById(assetId); const fs=a&&a.clips[clip]; return fs?Math.max(0.15,fs.length/(fps||10)):0.3; }
 function setLockClip(e,c,dur){ e._lockUntil=RUN.t+dur; if(e.clip!==c){e.clip=c;e._t=0;} }
 /* ============ IA / EXEMPLOS DE CÓDIGO ============ */
-const ROLE_CLIPS={'player-platformer':['idle','andar','pular'],'player-topdown':['idle','andar'],'atirador':['idle','atira'],'inimigo-persegue':['idle','andar'],'inimigo-patrulha':['idle','andar'],'inimigo-atira':['idle','atira'],'inimigo-cacador':['idle','andar','atira'],'aliado-segue':['idle','andar'],'aliado-atira':['idle','andar','atira'],'voa-persegue':['idle','andar'],'pulante':['idle','pular']};
+const ROLE_CLIPS={'player-platformer':['idle','andar','pular'],'player-topdown':['idle','andar'],'atirador':['idle','atira'],'inimigo-persegue':['idle','andar'],'inimigo-patrulha':['idle','andar'],'inimigo-atira':['idle','atira'],'inimigo-cacador':['idle','andar','atira'],'aliado-segue':['idle','andar'],'aliado-atira':['idle','andar','atira'],'voa-persegue':['idle','andar'],'pulante':['idle','pular'],'boss':['idle','andar','atira'],'inimigo-pula':['idle','pular','andar'],'inimigo-dash':['idle','andar'],'inimigo-invoca':['idle']};
 const EX_LABELS={'plataforma-movel':'Plataforma móvel (vai e volta)','segue-x':'Segue o player (eixo X)','olha-player':'Olha para o player (flip)','pulo-duplo':'Pulo duplo','flutua':'Flutua no lugar','persegue-pula':'Persegue e pula obstáculos','coleta-pontos':'Some ao encostar no player','patrulha-vertical':'Patrulha vertical','dash':'Dash (tecla X)','mola':'Mola (joga p/ cima)','esmagador':'Esmagador (sobe/desce)','plataforma-controle':'Controle plataforma (pulo variável)','patrulha-borda':'Inimigo anda e vira na beira','some-tempo':'Some depois de 5s','seguir-suave':'Persegue suave (top-down)'};
 const EXAMPLES={
 'plataforma-movel':`// Plataforma que vai e volta na horizontal
@@ -928,6 +958,10 @@ function ruleWhen(e, w, i, dt){ if(!w||!w.id)return false; const RK=(e?e.id:'g')
     case 'naTela':{ if(!e)return false; const vw=cv.width/cam.z,vh=cv.height/cam.z; return !(e.x+e.w<cam.x||e.x>cam.x+vw||e.y+e.h<cam.y||e.y>cam.y+vh); }
     case 'contadorMenor':{ const st=(e?e.state:RUN._gstate)||{}; return (st[w.nome||'c']||0)<(+w.valor||1); }
     case 'pertoDeNome':{ if(!e)return false; let bd=1e9; for(const z of RUN.ents){ if(z!==e&&!z.dead&&z.name===w.nome){ const dd=Math.hypot((z.x+z.w/2)-(e.x+e.w/2),(z.y+z.h/2)-(e.y+e.h/2)); if(dd<bd)bd=dd; } } return bd<(+w.dist||120); }
+    case 'temChaves': return (RUN._gstate.chaves||0)>=(+w.valor||1);
+    case 'switchLigado': return RUN._gstate[w.nome||'sw']===1;
+    case 'cronometroFim': return RUN._cdEnd!=null&&RUN.t>=RUN._cdEnd;
+    case 'cronometroMenor':{ if(RUN._cdEnd==null)return false; const rr=RUN._cdEnd-RUN.t; return rr>0&&rr<(+w.seg||5); }
     default: return false;
   }
 }
@@ -1001,6 +1035,19 @@ function ruleRun(e, a){ if(!a||!a.id)return;
     case 'teleportaAleatorio': if(e){ const vw=cv.width/cam.z,vh=cv.height/cam.z; e.x=cam.x+Math.random()*vw; e.y=cam.y+Math.random()*vh; } break;
     case 'puxarPlayer': if(RUN.player&&e){ const d=_toPlayer(e); RUN.player.vx=-d[0]*(+a.forca||300); if(SC.mode!=='platformer')RUN.player.vy=-d[1]*(+a.forca||300); } break;
     case 'curarPlayer': if(RUN.player&&RUN.player.hp!=null){ RUN.player.hp+=(+a.n||1); } break;
+    case 'pegarChave': RUN._gstate.chaves=(RUN._gstate.chaves||0)+1; break;
+    case 'ligarSwitch': RUN._gstate[a.nome||'sw']=1; break;
+    case 'desligarSwitch': RUN._gstate[a.nome||'sw']=0; break;
+    case 'iniciarCronometro': RUN._cdEnd=RUN.t+(+a.seg||30); break;
+    case 'mostrarCronometro': if(RUN._cdEnd!=null)RUN._hud='Tempo: '+Math.max(0,Math.ceil(RUN._cdEnd-RUN.t)); break;
+    case 'pararCronometro': RUN._cdEnd=null; break;
+    case 'somarTempo': if(RUN._cdEnd!=null)RUN._cdEnd+=(+a.seg||10); break;
+    case 'darVelocidade': RUN._buffSpd={mul:1.8,until:RUN.t+(+a.seg||6)}; break;
+    case 'darPuloAlto': RUN._buffJmp={mul:1.6,until:RUN.t+(+a.seg||6)}; break;
+    case 'inverterGravidade': SC.gravity=-SC.gravity; break;
+    case 'gravidadeNormal': SC.gravity=Math.abs(SC.gravity); break;
+    case 'invocarInimigo': if(assetById(a.asset)){ const bx=e?e.x:(RUN.player?RUN.player.x:0),by=e?e.y:(RUN.player?RUN.player.y:0); spawnRT({asset:a.asset,x:bx,y:by,behaviors:[{type:'inimigo-persegue',params:{vida:2,velocidade:90}}]}); } break;
+    case 'empurrarObj': if(e){ const d=_dirVec(a.dir); e.vx=d[0]*(+a.forca||400); e.vy=d[1]*(+a.forca||400); e.onGround=false; } break;
   }
 }
 function runObjRules(e, dt){ const rs=e.rules; if(!rs||!rs.length)return; for(let i=0;i<rs.length;i++){ if(ruleWhen(e,rs[i].w,i,dt)) ruleRun(e,rs[i].a); } }
@@ -1052,7 +1099,11 @@ const RULE_WHENS=[
  {id:'foraDaTela',label:'saiu da tela',scope:'obj'},
  {id:'naTela',label:'está visível na tela',scope:'obj'},
  {id:'contadorMenor',label:'contador <',scope:'both',fields:[{k:'nome',t:'nome',def:'c'},{k:'valor',t:'num',def:1}]},
- {id:'pertoDeNome',label:'perto de (nome) <',scope:'obj',fields:[{k:'nome',t:'nome',def:''},{k:'dist',t:'num',def:120,label:'px'}]}
+ {id:'pertoDeNome',label:'perto de (nome) <',scope:'obj',fields:[{k:'nome',t:'nome',def:''},{k:'dist',t:'num',def:120,label:'px'}]},
+ {id:'temChaves',label:'tem chaves ≥',scope:'both',fields:[{k:'valor',t:'num',def:1}]},
+ {id:'switchLigado',label:'interruptor ligado',scope:'both',fields:[{k:'nome',t:'nome',def:'sw'}]},
+ {id:'cronometroFim',label:'cronômetro acabou',scope:'both'},
+ {id:'cronometroMenor',label:'cronômetro < (s)',scope:'both',fields:[{k:'seg',t:'num',def:5}]}
 ];
 const RULE_ACTS=[
  {id:'pular',label:'pular (se no chão)',scope:'obj',fields:[{k:'forca',t:'num',def:520}]},
@@ -1122,7 +1173,20 @@ const RULE_ACTS=[
  {id:'escala',label:'mudar tamanho (escala)',scope:'obj',fields:[{k:'valor',t:'num',def:1}]},
  {id:'teleportaAleatorio',label:'teleportar p/ lugar aleatório',scope:'obj'},
  {id:'puxarPlayer',label:'puxar o player',scope:'obj',fields:[{k:'forca',t:'num',def:300}]},
- {id:'curarPlayer',label:'curar o player',scope:'both',fields:[{k:'n',t:'num',def:1}]}
+ {id:'curarPlayer',label:'curar o player',scope:'both',fields:[{k:'n',t:'num',def:1}]},
+ {id:'pegarChave',label:'ganhar uma chave',scope:'both'},
+ {id:'ligarSwitch',label:'ligar interruptor',scope:'both',fields:[{k:'nome',t:'nome',def:'sw'}]},
+ {id:'desligarSwitch',label:'desligar interruptor',scope:'both',fields:[{k:'nome',t:'nome',def:'sw'}]},
+ {id:'iniciarCronometro',label:'iniciar cronômetro (s)',scope:'both',fields:[{k:'seg',t:'num',def:30}]},
+ {id:'mostrarCronometro',label:'mostrar cronômetro',scope:'both'},
+ {id:'pararCronometro',label:'parar cronômetro',scope:'both'},
+ {id:'somarTempo',label:'somar tempo (s)',scope:'both',fields:[{k:'seg',t:'num',def:10}]},
+ {id:'darVelocidade',label:'dar velocidade ao player (s)',scope:'both',fields:[{k:'seg',t:'num',def:6}]},
+ {id:'darPuloAlto',label:'dar super pulo (s)',scope:'both',fields:[{k:'seg',t:'num',def:6}]},
+ {id:'inverterGravidade',label:'inverter gravidade',scope:'both'},
+ {id:'gravidadeNormal',label:'gravidade normal',scope:'both'},
+ {id:'invocarInimigo',label:'invocar inimigo',scope:'both',fields:[{k:'asset',t:'asset',def:''}]},
+ {id:'empurrarObj',label:'empurrar (direção)',scope:'obj',fields:[{k:'dir',t:'dir',def:'direita'},{k:'forca',t:'num',def:400}]}
 ];
 function _ropt(list,val){ return list.map(o=>'<option value="'+esc(o.id)+'"'+(o.id===val?' selected':'')+'>'+esc(o.label)+'</option>').join(''); }
 function _rblk(list,id){ return list.find(b=>b.id===id)||list[0]; }
