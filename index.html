@@ -697,7 +697,21 @@ const BEH_DEF={
   'poder-planar':{label:'Poder: planar (segurar pulo)',params:{fator:0.5}},
   'poder-ima':{label:'Poder: ímã (atrai itens)',params:{raio:160,forca:200}},
   'item':{label:'Item p/ inventário (coletar)',params:{nome:'item',valor:1}},
-  'bau':{label:'Baú (abre com J, dá item)',params:{nome:'item',valor:1}}
+  'bau':{label:'Baú (abre com J, dá item)',params:{nome:'item',valor:1}},
+  'patrulha-v':{label:'Patrulha vertical (sobe/desce)',params:{velocidade:60,distancia:96}},
+  'orbita':{label:'Girar em círculo (órbita)',params:{raio:60,velocidade:2}},
+  'senoide':{label:'Voar em onda (senoide)',params:{velocidade:80,altura:40,freq:3}},
+  'teleporte':{label:'Portal (teleporta ao alvo)',params:{nome:'saida'}},
+  'zona-cura':{label:'Zona de cura (recupera vida)',params:{porSeg:1}},
+  'zona-dano':{label:'Zona de dano (espinhos/lava)',params:{intervalo:1}},
+  'npc':{label:'NPC com fala (aperte J)',params:{texto:'Olá, aventureiro!'}},
+  'gerador':{label:'Gerador (cria objetos)',params:{asset:'',intervalo:2,max:30}},
+  'inimigo-divide':{label:'Inimigo que se divide',params:{vida:3,velocidade:70}},
+  'saida-chaves':{label:'Saída (precisa de chaves)',params:{chaves:1}},
+  'mola-lateral':{label:'Mola lateral (arremessa p/ lado)',params:{forca:500,dir:'dir'}},
+  'pulsar':{label:'Pulsar (cresce e encolhe)',params:{min:1,max:1.6,velocidade:3}},
+  'poder-voar':{label:'Poder: voar (segurar ↑)',params:{velocidade:220}},
+  'poder-tiro-carregado':{label:'Poder: tiro carregado (segurar J)',params:{tempo:0.6,velocidade:520}}
 };
 const BEH={
   'player-platformer':(e,p,dt)=>{ const _bs=(RUN._buffSpd&&RUN.t<RUN._buffSpd.until)?RUN._buffSpd.mul:1,_bj=(RUN._buffJmp&&RUN.t<RUN._buffJmp.until)?RUN._buffJmp.mul:1; const sp=(+p.speed||200)*_bs, jp=(+p.jump||560)*_bj; e.vx=(Input.right?sp:0)-(Input.left?sp:0); e.vy+=SC.gravity*dt; if(Input.jump&&e.onGround){e.vy=-jp; playSnd('pulo');} moveE(e,dt);
@@ -772,7 +786,21 @@ const BEH={
   'poder-planar':(e,p,dt)=>{ if(!e.onGround&&Input.jump&&e.vy>0)e.vy*=(+p.fator||0.5); },
   'poder-ima':(e,p,dt)=>{ const raio=+p.raio||160,f=+p.forca||200; for(const z of RUN.ents){ if(z===e||z.dead)continue; const isItem=(z.behaviors||[]).some(b=>b.type==='collectible'||b.type==='item'||b.type==='cura'||b.type==='chave'||b.type==='powerup-pontos'); if(!isItem)continue; const dx=e.x-z.x,dy=e.y-z.y,d=Math.hypot(dx,dy)||1; if(d<raio){ z.x+=dx/d*f*dt; z.y+=dy/d*f*dt; } } },
   'item':(e,p,dt)=>{ const pl=RUN.player; if(pl&&overlap(e,pl)){ const nm=p.nome||'item'; RUN._gstate[nm]=(RUN._gstate[nm]||0)+(+p.valor||1); e.dead=true; playSnd('moeda'); RUN._hud=nm+': '+RUN._gstate[nm]; } },
-  'bau':(e,p,dt)=>{ if(e.state._open)return; const pl=RUN.player; if(pl&&overlap(e,pl)&&Input.action){ e.state._open=true; const nm=p.nome||'item'; RUN._gstate[nm]=(RUN._gstate[nm]||0)+(+p.valor||1); playSnd('moeda'); RUN._hud='Baú! '+nm+': '+RUN._gstate[nm]; e._blink=0.6; } }
+  'bau':(e,p,dt)=>{ if(e.state._open)return; const pl=RUN.player; if(pl&&overlap(e,pl)&&Input.action){ e.state._open=true; const nm=p.nome||'item'; RUN._gstate[nm]=(RUN._gstate[nm]||0)+(+p.valor||1); playSnd('moeda'); RUN._hud='Baú! '+nm+': '+RUN._gstate[nm]; e._blink=0.6; } },
+  'patrulha-v':(e,p,dt)=>{ if(e.state._o===undefined){e.state._o=e.y;e.state._d=1;} e.y+=(+p.velocidade||60)*e.state._d*dt; if(Math.abs(e.y-e.state._o)>=(+p.distancia||96))e.state._d*=-1; },
+  'orbita':(e,p,dt)=>{ if(e.state._ox===undefined){e.state._ox=e.x;e.state._oy=e.y;e.state._oa=0;} e.state._oa+=dt*(+p.velocidade||2); const r=+p.raio||60; e.x=e.state._ox+Math.cos(e.state._oa)*r; e.y=e.state._oy+Math.sin(e.state._oa)*r; },
+  'senoide':(e,p,dt)=>{ if(e.state._sy0===undefined){e.state._sy0=e.y;e.state._st=0;} e.state._st+=dt; e.x+=(e.flip?-1:1)*(+p.velocidade||80)*dt; e.y=e.state._sy0+Math.sin(e.state._st*(+p.freq||3))*(+p.altura||40); },
+  'teleporte':(e,p,dt)=>{ const pl=RUN.player; if(pl&&overlap(e,pl)&&(RUN.t-(pl.state._tpt||-9))>0.6){ const t=RUN.ents.find(z=>z.name===p.nome&&z!==e&&!z.dead); if(t){ pl.x=t.x; pl.y=t.y; pl.state._tpt=RUN.t; playSnd('pulo'); } } },
+  'zona-cura':(e,p,dt)=>{ const pl=RUN.player; if(pl&&pl.hp!=null&&overlap(e,pl)){ e.state._h=(e.state._h||0)+dt; if(e.state._h>=(+p.porSeg||1)){ e.state._h=0; pl.hp+=1; playSnd('moeda'); } } },
+  'zona-dano':(e,p,dt)=>{ const pl=RUN.player; if(pl&&overlap(e,pl)){ e.state._z=(e.state._z||0)+dt; if(e.state._z>=(+p.intervalo||1)){ e.state._z=0; if(pl.hp!=null){ pl.hp--; if(pl.hp<=0)RUN.over='gameover'; else pl._blink=0.3; } else respawn(pl); playSnd('dano'); } } },
+  'npc':(e,p,dt)=>{ const pl=RUN.player; if(pl&&overlap(e,pl)&&Input.action){ RUN._hud=(p.texto||'Ol\u00e1!'); RUN._hudUntil=RUN.t+3; } },
+  'gerador':(e,p,dt)=>{ e.state._g=(e.state._g||0)-dt; if(e.state._g<=0){ e.state._g=+p.intervalo||2; const as=(p.asset&&assetById(p.asset))?p.asset:null; if(as&&RUN.ents.length<(+p.max||30)) spawnRT({asset:as,x:e.x,y:e.y,behaviors:[]}); } },
+  'inimigo-divide':(e,p,dt)=>{ if(e.hp===undefined)e.hp=+p.vida||3; e.isEnemy=true; const pl=RUN.player,sp=+p.velocidade||70; if(pl){ e.vx=Math.sign(pl.x-e.x)*sp; if(SC.mode==='platformer')e.vy+=SC.gravity*dt; else e.vy=Math.sign(pl.y-e.y)*sp; moveE(e,dt); e.flip=e.vx<0; if(overlap(e,pl)){respawn(pl);playSnd('dano');} } if(e.hp<=0){ e.dead=true; RUN.score=(RUN.score||0)+1; playSnd('moeda'); const sc=e.sx||1; if(sc>0.5){ for(let q=-1;q<=1;q+=2) spawnRT({asset:e.asset,x:e.x+q*18,y:e.y,sx:sc*0.6,sy:sc*0.6,behaviors:[{type:'inimigo-divide',params:{vida:Math.max(1,(+p.vida||3)-1),velocidade:sp}}]}); } } },
+  'saida-chaves':(e,p,dt)=>{ const pl=RUN.player; if(pl&&overlap(e,pl)){ if((RUN._gstate.chaves||0)>=(+p.chaves||1))RUN.over='win'; else { RUN._hud='Precisa de '+(+p.chaves||1)+' chaves'; RUN._hudUntil=RUN.t+1.5; } } },
+  'mola-lateral':(e,p,dt)=>{ const pl=RUN.player; if(pl&&overlap(e,pl)){ pl.vx=(+p.forca||500)*((p.dir==='esq')?-1:1); playSnd('pulo'); } },
+  'pulsar':(e,p,dt)=>{ e.state._ps=(e.state._ps||0)+dt; const mn=+p.min||1,mx=+p.max||1.6,v=+p.velocidade||3; const f=mn+(mx-mn)*(0.5+0.5*Math.sin(e.state._ps*v)); e.sx=f; e.sy=f; },
+  'poder-voar':(e,p,dt)=>{ if(Input.up||Input.jump){ e.vy=-(+p.velocidade||220); } },
+  'poder-tiro-carregado':(e,p,dt)=>{ if(Input.action){ e.state._chg=(e.state._chg||0)+dt; } else { if((e.state._chg||0)>(+p.tempo||0.6)){ const d=e.flip?-1:1,v=+p.velocidade||520; _bala(e,d,0,v); _bala(e,d,-0.12,v); _bala(e,d,0.12,v); playSnd('tiro'); } e.state._chg=0; } }
 };
 function hasAnimator(e){ return e.behaviors&&e.behaviors.some(b=>b.type==='animator'||b.type==='flow'); }
 function setNodeClip(e,p){ const n=p.nodes.find(x=>x.id===e.state._node); if(n&&hasClip(e,n.clip)&&e.clip!==n.clip){ e.clip=n.clip; e._t=0; } }
@@ -791,7 +819,7 @@ function clipDur(e,c){ const a=assetById(e.asset); const fs=a&&a.clips[c]; retur
 function clipDurAsset(assetId,clip,fps){ const a=assetById(assetId); const fs=a&&a.clips[clip]; return fs?Math.max(0.15,fs.length/(fps||10)):0.3; }
 function setLockClip(e,c,dur){ e._lockUntil=RUN.t+dur; if(e.clip!==c){e.clip=c;e._t=0;} }
 /* ============ IA / EXEMPLOS DE CÓDIGO ============ */
-const ROLE_CLIPS={'player-platformer':['idle','andar','pular'],'player-topdown':['idle','andar'],'atirador':['idle','atira'],'inimigo-persegue':['idle','andar'],'inimigo-patrulha':['idle','andar'],'inimigo-atira':['idle','atira'],'inimigo-cacador':['idle','andar','atira'],'aliado-segue':['idle','andar'],'aliado-atira':['idle','andar','atira'],'voa-persegue':['idle','andar'],'pulante':['idle','pular'],'boss':['idle','andar','atira'],'inimigo-pula':['idle','pular','andar'],'inimigo-dash':['idle','andar'],'inimigo-invoca':['idle']};
+const ROLE_CLIPS={'player-platformer':['idle','andar','pular'],'player-topdown':['idle','andar'],'atirador':['idle','atira'],'inimigo-persegue':['idle','andar'],'inimigo-patrulha':['idle','andar'],'inimigo-atira':['idle','atira'],'inimigo-cacador':['idle','andar','atira'],'aliado-segue':['idle','andar'],'aliado-atira':['idle','andar','atira'],'voa-persegue':['idle','andar'],'pulante':['idle','pular'],'boss':['idle','andar','atira'],'inimigo-pula':['idle','pular','andar'],'inimigo-dash':['idle','andar'],'inimigo-invoca':['idle'],'inimigo-divide':['idle','andar'],'senoide':['idle','andar']};
 const EX_LABELS={'plataforma-movel':'Plataforma móvel (vai e volta)','segue-x':'Segue o player (eixo X)','olha-player':'Olha para o player (flip)','pulo-duplo':'Pulo duplo','flutua':'Flutua no lugar','persegue-pula':'Persegue e pula obstáculos','coleta-pontos':'Some ao encostar no player','patrulha-vertical':'Patrulha vertical','dash':'Dash (tecla X)','mola':'Mola (joga p/ cima)','esmagador':'Esmagador (sobe/desce)','plataforma-controle':'Controle plataforma (pulo variável)','patrulha-borda':'Inimigo anda e vira na beira','some-tempo':'Some depois de 5s','seguir-suave':'Persegue suave (top-down)'};
 const EXAMPLES={
 'plataforma-movel':`// Plataforma que vai e volta na horizontal
@@ -984,6 +1012,8 @@ function ruleWhen(e, w, i, dt){ if(!w||!w.id)return false; const RK=(e?e.id:'g')
     case 'cronometroMenor':{ if(RUN._cdEnd==null)return false; const rr=RUN._cdEnd-RUN.t; return rr>0&&rr<(+w.seg||5); }
     case 'temItem': return (RUN._gstate[w.nome||'item']||0)>=(+w.valor||1);
     case 'semItem': return (RUN._gstate[w.nome||'item']||0)<=0;
+    case 'viradoDireita': return !!(e&&!e.flip);
+    case 'viradoEsquerda': return !!(e&&e.flip);
     default: return false;
   }
 }
@@ -1076,6 +1106,9 @@ function ruleRun(e, a){ if(!a||!a.id)return;
     case 'atirarLeque': if(e){ const d=e.flip?-1:1,v=+a.velocidade||340; [[d,0],[d,-0.35],[d,0.35],[d,-0.7],[d,0.7]].forEach(q=>_bala(e,q[0],q[1],v)); playSnd('tiro'); } break;
     case 'zerarItem': RUN._gstate[a.nome||'item']=0; break;
     case 'soltarItem': if(assetById(a.asset)&&e){ spawnRT({asset:a.asset,x:e.x+e.w/2,y:e.y,behaviors:[{type:'item',params:{nome:a.asset,valor:1}}]}); } break;
+    case 'teleportarPara': if(e){ const t=RUN.ents.find(z=>z.name===a.nome&&z!==e&&!z.dead); if(t){ e.x=t.x; e.y=t.y; } } break;
+    case 'salvarCheckpoint': if(RUN.player&&e){ RUN.player.startX=e.x; RUN.player.startY=e.y; } break;
+    case 'mensagem': RUN._hud=(''+(a.texto||'')); RUN._hudUntil=RUN.t+(+a.seg||3); break;
   }
 }
 function runObjRules(e, dt){ const rs=e.rules; if(!rs||!rs.length)return; for(let i=0;i<rs.length;i++){ if(ruleWhen(e,rs[i].w,i,dt)) ruleRun(e,rs[i].a); } }
@@ -1133,7 +1166,9 @@ const RULE_WHENS=[
  {id:'cronometroFim',label:'cronômetro acabou',scope:'both'},
  {id:'cronometroMenor',label:'cronômetro < (s)',scope:'both',fields:[{k:'seg',t:'num',def:5}]},
  {id:'temItem',label:'tem item (nome) ≥',scope:'both',fields:[{k:'nome',t:'nome',def:'item'},{k:'valor',t:'num',def:1}]},
- {id:'semItem',label:'não tem o item (nome)',scope:'both',fields:[{k:'nome',t:'nome',def:'item'}]}
+ {id:'semItem',label:'não tem o item (nome)',scope:'both',fields:[{k:'nome',t:'nome',def:'item'}]},
+ {id:'viradoDireita',label:'está virado p/ direita',scope:'obj'},
+ {id:'viradoEsquerda',label:'está virado p/ esquerda',scope:'obj'}
 ];
 const RULE_ACTS=[
  {id:'pular',label:'pular (se no chão)',scope:'obj',fields:[{k:'forca',t:'num',def:520}]},
@@ -1222,7 +1257,10 @@ const RULE_ACTS=[
  {id:'mostrarItem',label:'mostrar item no HUD (nome)',scope:'both',fields:[{k:'nome',t:'nome',def:'item'}]},
  {id:'atirarLeque',label:'atirar em leque',scope:'obj',fields:[{k:'velocidade',t:'num',def:340}]},
  {id:'zerarItem',label:'zerar item (nome)',scope:'both',fields:[{k:'nome',t:'nome',def:'item'}]},
- {id:'soltarItem',label:'soltar item aqui (arte)',scope:'obj',fields:[{k:'asset',t:'asset',def:''}]}
+ {id:'soltarItem',label:'soltar item aqui (arte)',scope:'obj',fields:[{k:'asset',t:'asset',def:''}]},
+ {id:'teleportarPara',label:'teleportar até (nome)',scope:'obj',fields:[{k:'nome',t:'nome',def:'saida'}]},
+ {id:'salvarCheckpoint',label:'salvar checkpoint aqui',scope:'obj'},
+ {id:'mensagem',label:'mostrar mensagem (tempo)',scope:'both',fields:[{k:'texto',t:'text',def:'Olá!'},{k:'seg',t:'num',def:3,label:'s'}]}
 ];
 function _ropt(list,val){ return list.map(o=>'<option value="'+esc(o.id)+'"'+(o.id===val?' selected':'')+'>'+esc(o.label)+'</option>').join(''); }
 function _rblk(list,id){ return list.find(b=>b.id===id)||list[0]; }
@@ -1301,6 +1339,7 @@ function loop(now){ if(!RUN)return; const dt=Math.min(0.05,(now-RUN.last)/1000);
       RUN.ents=RUN.ents.filter(e=>!e.dead); if(RUN.player&&RUN.player.dead)RUN.player=null;
       if(RUN._gfn){ try{ RUN._gfn.call(gameApi(dt),dt); }catch(err){ logMsg('⚠ Script global: '+err.message); RUN._gfn=null; } }
       try{ runGlobalRules(dt); }catch(_e){}
+      if(RUN._hudUntil&&RUN.t>RUN._hudUntil){ RUN._hud=null; RUN._hudUntil=0; }
     }
     if(RUN.player){ if(!RUN._bset){ RUN._bset=true; let mnx=Infinity,mny=Infinity,mxx=-Infinity,mxy=-Infinity,any=false; for(const k in SC.grid){ if(!SC.grid[k])continue; any=true; const pp=k.split(','),c=+pp[0],r=+pp[1]; if(c<mnx)mnx=c; if(c>mxx)mxx=c; if(r<mny)mny=r; if(r>mxy)mxy=r; } if(any){ const T=SC.tile,m=T*4; RUN._bounds={x:mnx*T-m,y:mny*T-m,w:(mxx-mnx+1)*T+2*m,h:(mxy-mny+1)*T+2*m}; } }
       const _tx=(RUN.player.x+RUN.player.w/2)-cv.width/(2*cam.z), _ty=(RUN.player.y+RUN.player.h/2)-cv.height/(2*cam.z);
