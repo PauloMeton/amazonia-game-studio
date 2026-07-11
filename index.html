@@ -343,6 +343,11 @@ if(this.enemies().length===0) this.win();"></textarea>
       <button id="btnGen">🎲 Gerar jogo (por texto)</button>
       <button id="btnCena">🗺️ Cenário por imagem → Jogo</button>
       <button id="btnCourse">📚 Aula / exemplos</button>
+      <button id="btnTplPlat">🕹️ Modelo: plataforma</button>
+      <button id="btnTplTop">🧭 Modelo: top-down</button>
+      <button id="btnTplShoot">🎯 Modelo: tiro</button>
+      <button id="btnDemo">🏰 Fase demo (mecânicas)</button>
+      <button id="btnScriptsHelp">📖 Ajuda de scripts</button>
     </div></div>
     <div class="menu"><button class="menubtn" id="mEditors">🛠️ Editores ▾</button><div class="menupop">
       <button id="btnArt">🎨 Editor de Arte</button>
@@ -1263,6 +1268,39 @@ const RULE_ACTS=[
  {id:'mensagem',label:'mostrar mensagem (tempo)',scope:'both',fields:[{k:'texto',t:'text',def:'Olá!'},{k:'seg',t:'num',def:3,label:'s'}]}
 ];
 function _ropt(list,val){ return list.map(o=>'<option value="'+esc(o.id)+'"'+(o.id===val?' selected':'')+'>'+esc(o.label)+'</option>').join(''); }
+function _optGroups(list,val,cats){ const byId={}; list.forEach(o=>byId[o.id]=o); const used={}; let html=''; cats.forEach(c=>{ const opts=c[1].filter(id=>byId[id]).map(id=>{ used[id]=1; const o=byId[id]; return '<option value="'+esc(o.id)+'"'+(String(o.id)===String(val)?' selected':'')+'>'+esc(o.label)+'</option>'; }); if(opts.length)html+='<optgroup label="'+esc(c[0])+'">'+opts.join('')+'</optgroup>'; }); const rest=list.filter(o=>!used[o.id]); if(rest.length)html+='<optgroup label="Outros">'+rest.map(o=>'<option value="'+esc(o.id)+'"'+(String(o.id)===String(val)?' selected':'')+'>'+esc(o.label)+'</option>').join('')+'</optgroup>'; return html; }
+const BEH_CATS=[
+ ['Jogador',['player-platformer','player-topdown']],
+ ['Inimigos',['inimigo','inimigo-persegue','inimigo-patrulha','inimigo-atira','inimigo-cacador','inimigo-pula','inimigo-dash','inimigo-invoca','inimigo-divide','boss','voa-persegue','hazard']],
+ ['Aliados',['aliado-segue','aliado-atira']],
+ ['Movimento / IA',['patrol','patrulha-v','follow','orbita','senoide','flutua','pulante','cai']],
+ ['Coletáveis / Itens',['collectible','cura','powerup-velocidade','powerup-pulo','powerup-pontos','chave','item','bau']],
+ ['Armas',['arma-espada','arma-tiro','arma-metralhadora','arma-espingarda']],
+ ['Poderes',['poder-pulo-duplo','poder-dash','poder-planar','poder-ima','poder-voar','poder-tiro-carregado']],
+ ['Plataformas / Física',['plataforma-h','plataforma-v','plataforma-cai','trampolim','esteira','vento','mola-lateral','pulsar']],
+ ['Cenário / Interação',['porta','botao','bloco-pisca','teleporte','zona-cura','zona-dano','npc','gerador','saida-chaves','checkpoint','some-tempo']],
+ ['Animação',['animator','keys','flow']]
+];
+const WHEN_CATS=[
+ ['Sempre / Tempo',['sempre','inicio','aposSeg','intervalo','chance','tempoJogo']],
+ ['Teclado / Toque',['teclaAperta','teclaSegura','teclaSolta','clique']],
+ ['Estado do objeto',['noChao','noAr','subindo','caindo','parado','andando','rapido','viradoDireita','viradoEsquerda','vidaMenor','vidaMaiorIgual','caiuTela','foraDaTela','naTela','xMaior','xMenor','yMaior','yMenor']],
+ ['Player / Colisão',['encosta','encostaInimigo','encostaPlayer','encostaAliado','pertoPlayer','longePlayer','pertoDeNome','playerDir','playerEsq','playerAcima','playerAbaixo']],
+ ['Placar / Contadores',['placarMaior','placarMenor','placarMultiplo','contadorMaior','contadorMenor','semInimigos']],
+ ['Itens / Chaves / Tempo',['temChaves','switchLigado','temItem','semItem','cronometroFim','cronometroMenor']]
+];
+const ACT_CATS=[
+ ['Movimento',['pular','pularSempre','moverDir','moverEsq','moverCima','moverBaixo','irAoPlayer','fugirPlayer','seguirSuave','parar','pararTudo','acelerar','frear','dash','velocidade','inverter','teleporta','teleportaPlayer','teleportarPara','quicar','planar','empurrarPlayer','congelarPlayer','empurrarObj','impulsoCima','olharMovimento']],
+ ['Aparência',['animar','virar','virarPlayer','invisivel','visivel','piscar','crescer','encolher','escala','trocarArte']],
+ ['Combate',['atirar','rajada','atirarLeque','danoPlayer','levarDano','morrer','explodir','respawn','curarPlayer','invocarInimigo']],
+ ['Criar objetos',['criarAqui','criarNoPlayer','criarXY','criarAleatorio','criarPro','soltarItem']],
+ ['Placar / Vida / Contadores',['placarMais','placarMenos','placarDef','mostrarPlacar','vidaPlayerMais','vidaPlayerMenos','definirVidaPlayer','contadorMais','contadorZera','contadorDef']],
+ ['Itens / Chaves',['pegarChave','ligarSwitch','desligarSwitch','darItem','usarItem','mostrarItem','zerarItem','salvarCheckpoint']],
+ ['Cronômetro',['iniciarCronometro','mostrarCronometro','pararCronometro','somarTempo']],
+ ['Power-ups / Física',['darVelocidade','darPuloAlto','inverterGravidade','gravidadeNormal','gravidade']],
+ ['Jogo / HUD',['som','aviso','mensagem','limparAviso','vencer','perder','reiniciar','proximaCena','tremer']]
+];
+
 function _rblk(list,id){ return list.find(b=>b.id===id)||list[0]; }
 function _rfield(def, part, ctx){ const wrap=document.createElement('span'); wrap.style.cssText='display:inline-flex;align-items:center;gap:2px;margin-left:4px';
   if(def.label){ const l=document.createElement('span'); l.className='note'; l.style.fontSize='10px'; l.textContent=def.label; wrap.appendChild(l); }
@@ -1280,11 +1318,11 @@ function renderRuleEditor(host, rules, isGlobal, ctx){ if(!host)return; ctx=ctx|
   rules.forEach((r,idx)=>{ const row=document.createElement('div'); row.style.cssText='border:1px solid var(--line);border-radius:6px;padding:5px;margin-bottom:5px;background:#0c1610';
     const l1=document.createElement('div'); l1.style.cssText='display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin-bottom:4px';
     const q=document.createElement('b'); q.textContent='Quando'; q.style.cssText='color:var(--accent2);font-size:11px'; l1.appendChild(q);
-    const ws=document.createElement('select'); ws.innerHTML=_ropt(whenL,r.w.id); ws.style.cssText='font-size:11px;padding:2px 4px;max-width:170px'; ws.onchange=()=>{ r.w={id:ws.value}; touch(); renderRuleEditor(host,rules,isGlobal,ctx); }; l1.appendChild(ws);
+    const ws=document.createElement('select'); ws.innerHTML=_optGroups(whenL,r.w.id,WHEN_CATS); ws.style.cssText='font-size:11px;padding:2px 4px;max-width:170px'; ws.onchange=()=>{ r.w={id:ws.value}; touch(); renderRuleEditor(host,rules,isGlobal,ctx); }; l1.appendChild(ws);
     (_rblk(whenL,r.w.id).fields||[]).forEach(def=>l1.appendChild(_rfield(def,r.w,ctx)));
     const l2=document.createElement('div'); l2.style.cssText='display:flex;flex-wrap:wrap;align-items:center;gap:3px';
     const f=document.createElement('b'); f.textContent='→ Faça'; f.style.cssText='color:var(--accent);font-size:11px'; l2.appendChild(f);
-    const as=document.createElement('select'); as.innerHTML=_ropt(actL,r.a.id); as.style.cssText='font-size:11px;padding:2px 4px;max-width:170px'; as.onchange=()=>{ r.a={id:as.value}; touch(); renderRuleEditor(host,rules,isGlobal,ctx); }; l2.appendChild(as);
+    const as=document.createElement('select'); as.innerHTML=_optGroups(actL,r.a.id,ACT_CATS); as.style.cssText='font-size:11px;padding:2px 4px;max-width:170px'; as.onchange=()=>{ r.a={id:as.value}; touch(); renderRuleEditor(host,rules,isGlobal,ctx); }; l2.appendChild(as);
     (_rblk(actL,r.a.id).fields||[]).forEach(def=>l2.appendChild(_rfield(def,r.a,ctx)));
     const rm=document.createElement('button'); rm.textContent='✕'; rm.className='danger'; rm.style.cssText='padding:1px 6px;font-size:11px;margin-left:auto'; rm.onclick=()=>{ rules.splice(idx,1); touch(); renderRuleEditor(host,rules,isGlobal,ctx); }; l2.appendChild(rm);
     row.appendChild(l1); row.appendChild(l2); host.appendChild(row); });
@@ -1417,7 +1455,7 @@ function refreshInspector(){ const w=g('insp'); if(!sel){ w.innerHTML='<p class=
   h+='<label style="margin-top:6px">Direção da arte (no jogo)</label><select id="inFace"><option value="auto"'+((sel.faceMode||'auto')==='auto'?' selected':'')+'>Espelhar ao andar (arte olha p/ direita)</option><option value="left"'+(sel.faceMode==='left'?' selected':'')+'>Arte olha p/ esquerda (não inverter)</option><option value="lock"'+(sel.faceMode==='lock'?' selected':'')+'>Nunca espelhar</option></select>';
   h+='<label style="margin-top:6px">Camada</label><select id="inLayer">'+SC.layers.map((L,i)=>'<option value="'+L.id+'"'+((sel.layer||SC.active)===L.id?' selected':'')+'>'+(i+1)+' · '+esc(L.name)+'</option>').join('')+'</select>';
   h+='<h3 style="margin-top:10px;color:var(--accent2);font-size:11px;text-transform:uppercase">Comportamentos</h3><div id="behs"></div>';
-  h+='<div class="row" style="margin-top:4px"><select id="behAdd"><option value="">+ adicionar...</option>'+Object.keys(BEH_DEF).map(k=>'<option value="'+k+'">'+BEH_DEF[k].label+'</option>').join('')+'</select></div>';
+  h+='<div class="row" style="margin-top:4px"><select id="behAdd"><option value="">+ adicionar comportamento...</option>'+_optGroups(Object.keys(BEH_DEF).map(k=>({id:k,label:BEH_DEF[k].label})),'',BEH_CATS)+'</select></div>';
   h+='<h3 style="margin-top:10px;color:var(--accent);font-size:11px;text-transform:uppercase">🧩 Regras — Quando → Faça (sem código)</h3><div id="inRules"></div>';
   h+='<h3 style="margin-top:10px;color:var(--accent2);font-size:11px;text-transform:uppercase">Script (JS) — avançado</h3>';
   h+='<div class="row"><input id="aiCodePrompt" placeholder="descreva: ex: persegue o player e pula"><button id="aiCodeGen" class="primary" style="white-space:nowrap">✨ IA</button></div>';
@@ -1656,6 +1694,30 @@ function exampleProject(kind){ const hero=makeHero(), coin=makeCoin();
   const scene={name:(kind==='platformer'?'fase plataforma':'fase top-down'),mode:mode,tile:32,gravity:gravity,bg:'#0a0f0c',tileColor:'#3a5d44',grid:grid,layers:[{id:'L1',name:'Cenário',visible:true},{id:'L2',name:'Objetos',visible:true}],active:'L2',entities:entities};
   return {v:2,name:(kind==='platformer'?'modelo-plataforma':'modelo-topdown'),cur:0,target:'desktop',touchctl:'auto',camZoom:1,assets:assets,scenes:[scene]}; }
 async function loadCourse(kind){ if(!await confirmDialog('Carregar o projeto-modelo? O projeto atual fica salvo localmente até você salvar de novo.')) return; loadProject(exampleProject(kind)); g('courseModal').classList.remove('open'); touch(); logMsg('📚 Projeto-modelo "'+kind+'" carregado! Clique em ▶ Jogar para testar. Estude os Comportamentos de cada objeto no Inspetor.'); }
+
+
+function tplLoad(desc,nm){ confirmDialog('Carregar o modelo "'+nm+'"? O projeto atual fica salvo localmente.').then(ok=>{ if(ok){ try{ loadProject(genGameFromText(desc)); touch(); toast('Modelo "'+nm+'" carregado — clique em ▶ Jogar!'); }catch(e){ logMsg('Erro: '+e.message); } } }); }
+function buildDemoProject(){ const hero=makeHero(), coin=makeCoin();
+  const assets=[{id:'hero',name:'heroi',raw:hero},{id:'coin',name:'moeda',raw:coin}]; const grid={};
+  const T=32; for(let x=0;x<46;x++) grid[x+',12']=1;
+  grid['9,9']=1; grid['10,9']=1; grid['11,9']=1; grid['16,8']=1; grid['17,8']=1; grid['24,9']=1; grid['25,9']=1; grid['26,9']=1;
+  const ent=(id,name,x,y,asset,beh,sx,sy)=>({id:id,name:name,x:x,y:y,asset:asset,clip:'idle',sx:sx||2,sy:sy||2,fps:8,flip:false,layer:'L2',behaviors:beh,script:'',faceMode:'auto'});
+  const entities=[
+    ent('p','heroi',60,320,'hero',[{type:'player-platformer',params:{speed:200,jump:560}},{type:'animator',params:{parado:'idle',andando:'andar',pulando:'idle',caindo:'idle'}},{type:'arma-tiro',params:{velocidade:380,cadencia:0.3}},{type:'poder-pulo-duplo',params:{forca:500,extras:1}}]),
+    ent('c1','moeda',9*T+8,8*T,'coin',[{type:'collectible',params:{value:1}}]),
+    ent('c2','moeda',16*T+8,7*T,'coin',[{type:'collectible',params:{value:1}}]),
+    ent('tr','moeda',6*T,11*T,'coin',[{type:'trampolim',params:{forca:820}}]),
+    ent('mv','moeda',20*T,10*T,'coin',[{type:'plataforma-h',params:{velocidade:70,distancia:96}}]),
+    ent('zn','moeda',13*T,11*T,'coin',[{type:'zona-dano',params:{intervalo:0.8}}]),
+    ent('en','inimigo',22*T,11*T,'hero',[{type:'inimigo-persegue',params:{vida:2,velocidade:80}},{type:'animator',params:{parado:'idle',andando:'andar'}}]),
+    ent('kv','chave',17*T+8,6*T,'coin',[{type:'chave',params:{}}]),
+    ent('bo','chefe',34*T,10*T,'hero',[{type:'boss',params:{vida:8,velocidade:45,cadencia:1.6,velocidadeBala:240}},{type:'animator',params:{parado:'idle',andando:'andar'}}],3,3),
+    ent('sd','saida',44*T,10.3*T,'hero',[{type:'saida-chaves',params:{chaves:1}}])
+  ];
+  const scene={name:'fase demo',mode:'platformer',tile:T,gravity:1800,bg:'#0a0f0c',tileColor:'#3a5d44',grid:grid,layers:[{id:'L1',name:'Cenário',visible:true},{id:'L2',name:'Objetos',visible:true}],active:'L2',globalScript:'',globalRules:[{w:{id:'sempre'},a:{id:'mostrarPlacar'}}],entities:entities};
+  return {v:2,name:'fase-demo',cur:0,target:'desktop',touchctl:'auto',camZoom:1,assets:assets,scenes:[scene]}; }
+function loadDemo(){ confirmDialog('Carregar a fase demo? O projeto atual fica salvo localmente.').then(ok=>{ if(ok){ try{ loadProject(buildDemoProject()); touch(); toast('Fase demo carregada! Pegue a chave, chegue à saída, cuidado com o chefe. ▶ Jogar'); }catch(e){ logMsg('Erro: '+e.message); } } }); }
+function openScriptsHelp(){ g('scriptsModal').classList.add('open'); }
 
 /* ============ EDITOR DE ARTE (módulo) ============ */
 function openArtEditor(){ const f=g('artFrame'); if(!f.getAttribute('src')) f.setAttribute('src','amazonia-pixel-studio.html'); g('artEditor').style.display='flex'; }
@@ -2033,6 +2095,12 @@ function wire(){ buildTools(); setTool('select');
   g('btnArt').onclick=openArtEditor; g('artClose').onclick=closeArtEditor;
   g('btnTut').onclick=()=>g('tutModal').classList.add('open'); g('tutClose').onclick=()=>g('tutModal').classList.remove('open');
   g('btnCourse').onclick=()=>g('courseModal').classList.add('open'); g('courseClose').onclick=()=>g('courseModal').classList.remove('open');
+  if(g('btnTplPlat'))g('btnTplPlat').onclick=()=>tplLoad('jogo de plataforma na floresta com inimigos e moedas','plataforma');
+  if(g('btnTplTop'))g('btnTplTop').onclick=()=>tplLoad('jogo top-down de aventura com inimigos e moedas','top-down');
+  if(g('btnTplShoot'))g('btnTplShoot').onclick=()=>tplLoad('jogo de tiro top-down com atirador inimigos e moedas','tiro');
+  if(g('btnDemo'))g('btnDemo').onclick=loadDemo;
+  if(g('btnScriptsHelp'))g('btnScriptsHelp').onclick=openScriptsHelp;
+  if(g('scriptsClose'))g('scriptsClose').onclick=()=>g('scriptsModal').classList.remove('open');
   g('btnGlobal').onclick=()=>{ g('gScript').value=SC.globalScript||''; g('gMsg').textContent=''; SC.globalRules=SC.globalRules||[]; try{ renderRuleEditor(g('gRules'), SC.globalRules, true, {assets:PR.assets}); }catch(_e){} g('globalModal').classList.add('open'); }; g('gClose').onclick=()=>g('globalModal').classList.remove('open');
   g('gApply').onclick=()=>{ SC.globalScript=g('gScript').value; try{ if(SC.globalScript.trim())new Function('dt',SC.globalScript); g('gMsg').textContent='✅ Script global salvo. Clique em ▶ Jogar.'; }catch(err){ g('gMsg').textContent='⚠ Erro: '+err.message; } touch(); };
   const GEX={ vencer:"this.hud('Inimigos: '+this.enemies().length+'  •  Pontos: '+this.score);\nif(this.enemies().length===0) this.win();",
@@ -2115,6 +2183,23 @@ if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded'
     <button id="welcomeTut">❓ Abrir o tutorial</button>
     <button id="welcomeStart">✏️ Começar do zero</button>
     <p class="note">Dica: ▶ Jogar testa na hora • Ctrl+Z desfaz • no celular use ☰ para abrir os painéis.</p>
+  </div>
+</div>
+<div id="scriptsModal" class="modal">
+  <div class="auth-card" style="width:640px;max-width:96%;max-height:90%;overflow:auto;gap:8px;text-align:left">
+    <div class="row" style="justify-content:space-between"><div class="auth-logo" style="margin:0;font-size:1.05em">📖 Ajuda de Scripts (JS)</div><button id="scriptsClose">fechar</button></div>
+    <p class="note">Dois lugares para código: <b>Script do objeto</b> (Inspetor) roda por objeto; <b>Script global</b> (botão Script) roda no jogo todo. A variável <code>dt</code> é o tempo do quadro (s).</p>
+    <p class="note"><b>Objeto</b> — use <code>this</code>: <code>x,y,vx,vy</code> (ler/escrever), <code>w,h,onGround,flip,name,state,input,gravity,mode,tile</code>; métodos <code>move()</code>, <code>play('clip')</code>, <code>solidAt(x,y)</code>, <code>player()</code>, <code>find('nome')</code>, <code>overlaps(o)</code>, <code>spawn({asset,x,y,vx,vy,behaviors})</code>, <code>shoot(dx,dy,sp)</code>, <code>destroy()</code>, <code>sound('pulo'|'moeda'|'dano'|'tiro')</code>, <code>log()</code>. Em plataforma: <code>this.vy+=this.gravity*dt;</code> antes de <code>this.move()</code>.</p>
+    <p class="note"><b>Global</b> — use <code>this</code>: <code>dt,t,score</code>, <code>player()</code>, <code>ents()</code>, <code>enemies()</code>, <code>allies()</code>, <code>find(n)</code>, <code>count(fn)</code>, <code>spawnAt('arte',x,y,[comps])</code>, <code>win()</code>, <code>lose()</code>, <code>isOver()</code>, <code>hud('texto')</code>, <code>key('KeyJ')</code>, <code>state</code>, <code>sound()</code>, <code>tile</code>, <code>mode</code>.</p>
+    <p class="note" style="color:var(--accent2)"><b>Exemplo (objeto) — perseguir o player:</b></p>
+    <textarea readonly rows="5" style="font-size:11px">var p=this.player();
+if(p){ var dir=p.x>this.x?1:-1; this.vx=90*dir; this.flip=dir<0; }
+this.vy+=this.gravity*dt;
+this.move();</textarea>
+    <p class="note" style="color:var(--accent2)"><b>Exemplo (global) — vencer com 20 pontos:</b></p>
+    <textarea readonly rows="2" style="font-size:11px">this.hud('Placar: '+this.score);
+if(this.score>=20) this.win();</textarea>
+    <p class="note">💡 Para uma IA externa escrever o código pronto: abra o arquivo <b>GUIA-SCRIPTS-IA.md</b> (na pasta do projeto), copie o bloco "PROMPT PRONTO" + o guia, cole na IA e descreva o que quer.</p>
   </div>
 </div>
 </body>
