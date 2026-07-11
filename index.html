@@ -663,7 +663,16 @@ const BEH_DEF={
   'inimigo-atira':{label:'Inimigo: atirador (para e atira)',params:{vida:3,velocidade:40,alcance:300,cadencia:1.1,velocidadeBala:260}},
   'inimigo-cacador':{label:'Inimigo: perseguidor atirador',params:{vida:3,velocidade:80,alcance:320,cadencia:1.0,velocidadeBala:300}},
   'aliado-segue':{label:'Aliado: fica ao seu lado',params:{velocidade:150,distancia:56}},
-  'aliado-atira':{label:'Aliado: fica ao lado e atira',params:{velocidade:140,distancia:60,alcance:420,cadencia:0.5,velocidadeBala:320}}
+  'aliado-atira':{label:'Aliado: fica ao lado e atira',params:{velocidade:140,distancia:60,alcance:420,cadencia:0.5,velocidadeBala:320}},
+  'flutua':{label:'Flutuar (sobe e desce)',params:{altura:24,velocidade:2}},
+  'plataforma-h':{label:'Plataforma móvel horizontal',params:{velocidade:60,distancia:120}},
+  'plataforma-v':{label:'Plataforma móvel vertical',params:{velocidade:60,distancia:120}},
+  'pulante':{label:'Pula sozinho (mola)',params:{forca:520}},
+  'cai':{label:'Cai com gravidade',params:{}},
+  'cura':{label:'Cura o player ao tocar',params:{vida:1}},
+  'checkpoint':{label:'Checkpoint (salva o retorno)',params:{}},
+  'some-tempo':{label:'Some depois de … s',params:{seg:3}},
+  'voa-persegue':{label:'Inimigo voador (persegue)',params:{vida:3,velocidade:90}}
 };
 const BEH={
   'player-platformer':(e,p,dt)=>{ const sp=+p.speed||200, jp=+p.jump||560; e.vx=(Input.right?sp:0)-(Input.left?sp:0); e.vy+=SC.gravity*dt; if(Input.jump&&e.onGround){e.vy=-jp; playSnd('pulo');} moveE(e,dt);
@@ -704,7 +713,16 @@ const BEH={
   'flow':(e,p,dt)=>{ if(!p.nodes||!p.nodes.length)return; if(e._lockUntil&&RUN.t<e._lockUntil)return;
     if(e.state._node===undefined||!p.nodes.some(n=>n.id===e.state._node)){ e.state._node=p.start||p.nodes[0].id; e._t=0; setNodeClip(e,p); }
     const outs=(p.transitions||[]).filter(t=>t.from===e.state._node);
-    for(const t of outs){ if(flowCond(e,t,p)){ if(t.to!==e.state._node){ e.state._node=t.to; e._t=0; setNodeClip(e,p); } break; } } }
+    for(const t of outs){ if(flowCond(e,t,p)){ if(t.to!==e.state._node){ e.state._node=t.to; e._t=0; setNodeClip(e,p); } break; } } },
+  'flutua':(e,p,dt)=>{ if(e.state._fy===undefined){e.state._fy=e.y;e.state._ft=0;} e.state._ft+=dt; e.y=e.state._fy+Math.sin(e.state._ft*(+p.velocidade||2))*(+p.altura||24); },
+  'plataforma-h':(e,p,dt)=>{ if(e.state._px===undefined){e.state._px=e.x;e.state._pd=1;} const sp=+p.velocidade||60,dist=+p.distancia||120,ox=e.x; e.x+=sp*e.state._pd*dt; if(Math.abs(e.x-e.state._px)>=dist)e.state._pd*=-1; const dx=e.x-ox,pl=RUN.player; if(pl&&pl.vy>=0&&pl.x+pl.w>e.x&&pl.x<e.x+e.w&&Math.abs((pl.y+pl.h)-e.y)<=8)pl.x+=dx; },
+  'plataforma-v':(e,p,dt)=>{ if(e.state._py===undefined){e.state._py=e.y;e.state._pvd=1;} const sp=+p.velocidade||60,dist=+p.distancia||120,oy=e.y; e.y+=sp*e.state._pvd*dt; if(Math.abs(e.y-e.state._py)>=dist)e.state._pvd*=-1; const dy=e.y-oy,pl=RUN.player; if(pl&&pl.x+pl.w>e.x&&pl.x<e.x+e.w&&Math.abs((pl.y+pl.h)-e.y)<=10){ pl.y+=dy; if(dy<0)pl.vy=0; } },
+  'pulante':(e,p,dt)=>{ e.vy+=SC.gravity*dt; if(e.onGround)e.vy=-(+p.forca||520); moveE(e,dt); if(!hasAnimator(e))autoClip(e,['pular','jump','idle','parado']); },
+  'cai':(e,p,dt)=>{ e.vy+=SC.gravity*dt; moveE(e,dt); },
+  'cura':(e,p,dt)=>{ const pl=RUN.player; if(pl&&overlap(e,pl)){ if(pl.hp!=null)pl.hp+=(+p.vida||1); e.dead=true; playSnd('moeda'); } },
+  'checkpoint':(e,p,dt)=>{ const pl=RUN.player; if(pl&&!e.state._done&&overlap(e,pl)){ e.state._done=true; pl.startX=e.x; pl.startY=e.y; playSnd('moeda'); RUN._hud='Checkpoint!'; } },
+  'some-tempo':(e,p,dt)=>{ e.state._st=(e.state._st||0)+dt; if(e.state._st>=(+p.seg||3))e.dead=true; },
+  'voa-persegue':(e,p,dt)=>{ e.isEnemy=true; if(e.hp===undefined)e.hp=+p.vida||3; const pl=RUN.player,sp=+p.velocidade||90; if(pl){ const ddx=pl.x-e.x,ddy=pl.y-e.y,d=Math.hypot(ddx,ddy)||1; e.x+=ddx/d*sp*dt; e.y+=ddy/d*sp*dt; e.flip=ddx<0; if(overlap(e,pl)){ respawn(pl); playSnd('dano'); } } if(e.hp<=0){e.dead=true;RUN.score=(RUN.score||0)+1;playSnd('moeda');} if(!hasAnimator(e))autoClip(e,['andar','walk','idle','parado']); }
 };
 function hasAnimator(e){ return e.behaviors&&e.behaviors.some(b=>b.type==='animator'||b.type==='flow'); }
 function setNodeClip(e,p){ const n=p.nodes.find(x=>x.id===e.state._node); if(n&&hasClip(e,n.clip)&&e.clip!==n.clip){ e.clip=n.clip; e._t=0; } }
@@ -723,7 +741,7 @@ function clipDur(e,c){ const a=assetById(e.asset); const fs=a&&a.clips[c]; retur
 function clipDurAsset(assetId,clip,fps){ const a=assetById(assetId); const fs=a&&a.clips[clip]; return fs?Math.max(0.15,fs.length/(fps||10)):0.3; }
 function setLockClip(e,c,dur){ e._lockUntil=RUN.t+dur; if(e.clip!==c){e.clip=c;e._t=0;} }
 /* ============ IA / EXEMPLOS DE CÓDIGO ============ */
-const ROLE_CLIPS={'player-platformer':['idle','andar','pular'],'player-topdown':['idle','andar'],'atirador':['idle','atira'],'inimigo-persegue':['idle','andar'],'inimigo-patrulha':['idle','andar'],'inimigo-atira':['idle','atira'],'inimigo-cacador':['idle','andar','atira'],'aliado-segue':['idle','andar'],'aliado-atira':['idle','andar','atira']};
+const ROLE_CLIPS={'player-platformer':['idle','andar','pular'],'player-topdown':['idle','andar'],'atirador':['idle','atira'],'inimigo-persegue':['idle','andar'],'inimigo-patrulha':['idle','andar'],'inimigo-atira':['idle','atira'],'inimigo-cacador':['idle','andar','atira'],'aliado-segue':['idle','andar'],'aliado-atira':['idle','andar','atira'],'voa-persegue':['idle','andar'],'pulante':['idle','pular']};
 const EX_LABELS={'plataforma-movel':'Plataforma móvel (vai e volta)','segue-x':'Segue o player (eixo X)','olha-player':'Olha para o player (flip)','pulo-duplo':'Pulo duplo','flutua':'Flutua no lugar','persegue-pula':'Persegue e pula obstáculos','coleta-pontos':'Some ao encostar no player','patrulha-vertical':'Patrulha vertical','dash':'Dash (tecla X)','mola':'Mola (joga p/ cima)','esmagador':'Esmagador (sobe/desce)','plataforma-controle':'Controle plataforma (pulo variável)','patrulha-borda':'Inimigo anda e vira na beira','some-tempo':'Some depois de 5s','seguir-suave':'Persegue suave (top-down)'};
 const EXAMPLES={
 'plataforma-movel':`// Plataforma que vai e volta na horizontal
@@ -905,6 +923,11 @@ function ruleWhen(e, w, i, dt){ if(!w||!w.id)return false; const RK=(e?e.id:'g')
     case 'yMaior': return !!(e&&e.y>(+w.valor||0));
     case 'yMenor': return !!(e&&e.y<(+w.valor||0));
     case 'placarMenor': return (RUN.score||0)<(+w.valor||1);
+    case 'vidaMaiorIgual': return !!(e&&e.hp!=null&&e.hp>=(+w.valor||1));
+    case 'foraDaTela':{ if(!e)return false; const vw=cv.width/cam.z,vh=cv.height/cam.z; return e.x+e.w<cam.x||e.x>cam.x+vw||e.y+e.h<cam.y||e.y>cam.y+vh; }
+    case 'naTela':{ if(!e)return false; const vw=cv.width/cam.z,vh=cv.height/cam.z; return !(e.x+e.w<cam.x||e.x>cam.x+vw||e.y+e.h<cam.y||e.y>cam.y+vh); }
+    case 'contadorMenor':{ const st=(e?e.state:RUN._gstate)||{}; return (st[w.nome||'c']||0)<(+w.valor||1); }
+    case 'pertoDeNome':{ if(!e)return false; let bd=1e9; for(const z of RUN.ents){ if(z!==e&&!z.dead&&z.name===w.nome){ const dd=Math.hypot((z.x+z.w/2)-(e.x+e.w/2),(z.y+z.h/2)-(e.y+e.h/2)); if(dd<bd)bd=dd; } } return bd<(+w.dist||120); }
     default: return false;
   }
 }
@@ -972,6 +995,12 @@ function ruleRun(e, a){ if(!a||!a.id)return;
     case 'limparAviso': RUN._hud=null; break;
     case 'olharMovimento': if(e)e.flip=e.vx<0; break;
     case 'tremer': RUN._shake=(+a.forca||8); break;
+    case 'trocarArte': if(e&&assetById(a.asset)){ e.asset=a.asset; e.baseAsset=a.asset; e._t=0; } break;
+    case 'impulsoCima': if(e){ e.vy=-(+a.forca||520); e.onGround=false; } break;
+    case 'escala': if(e){ const v=+a.valor||1; e.sx=v; e.sy=v; } break;
+    case 'teleportaAleatorio': if(e){ const vw=cv.width/cam.z,vh=cv.height/cam.z; e.x=cam.x+Math.random()*vw; e.y=cam.y+Math.random()*vh; } break;
+    case 'puxarPlayer': if(RUN.player&&e){ const d=_toPlayer(e); RUN.player.vx=-d[0]*(+a.forca||300); if(SC.mode!=='platformer')RUN.player.vy=-d[1]*(+a.forca||300); } break;
+    case 'curarPlayer': if(RUN.player&&RUN.player.hp!=null){ RUN.player.hp+=(+a.n||1); } break;
   }
 }
 function runObjRules(e, dt){ const rs=e.rules; if(!rs||!rs.length)return; for(let i=0;i<rs.length;i++){ if(ruleWhen(e,rs[i].w,i,dt)) ruleRun(e,rs[i].a); } }
@@ -1018,7 +1047,12 @@ const RULE_WHENS=[
  {id:'placarMultiplo',label:'placar múltiplo de',scope:'both',fields:[{k:'valor',t:'num',def:10}]},
  {id:'semInimigos',label:'não há inimigos',scope:'both'},
  {id:'tempoJogo',label:'tempo de jogo ≥ (s)',scope:'both',fields:[{k:'seg',t:'num',def:30,label:'s'}]},
- {id:'contadorMaior',label:'contador ≥',scope:'both',fields:[{k:'nome',t:'nome',def:'c'},{k:'valor',t:'num',def:1}]}
+ {id:'contadorMaior',label:'contador ≥',scope:'both',fields:[{k:'nome',t:'nome',def:'c'},{k:'valor',t:'num',def:1}]},
+ {id:'vidaMaiorIgual',label:'vida ≥',scope:'obj',fields:[{k:'valor',t:'num',def:3}]},
+ {id:'foraDaTela',label:'saiu da tela',scope:'obj'},
+ {id:'naTela',label:'está visível na tela',scope:'obj'},
+ {id:'contadorMenor',label:'contador <',scope:'both',fields:[{k:'nome',t:'nome',def:'c'},{k:'valor',t:'num',def:1}]},
+ {id:'pertoDeNome',label:'perto de (nome) <',scope:'obj',fields:[{k:'nome',t:'nome',def:''},{k:'dist',t:'num',def:120,label:'px'}]}
 ];
 const RULE_ACTS=[
  {id:'pular',label:'pular (se no chão)',scope:'obj',fields:[{k:'forca',t:'num',def:520}]},
@@ -1082,7 +1116,13 @@ const RULE_ACTS=[
  {id:'contadorMais',label:'contador +',scope:'both',fields:[{k:'nome',t:'nome',def:'c'},{k:'n',t:'num',def:1}]},
  {id:'contadorZera',label:'zerar contador',scope:'both',fields:[{k:'nome',t:'nome',def:'c'}]},
  {id:'contadorDef',label:'definir contador',scope:'both',fields:[{k:'nome',t:'nome',def:'c'},{k:'n',t:'num',def:0}]},
- {id:'tremer',label:'tremer a tela',scope:'both',fields:[{k:'forca',t:'num',def:8}]}
+ {id:'tremer',label:'tremer a tela',scope:'both',fields:[{k:'forca',t:'num',def:8}]},
+ {id:'trocarArte',label:'trocar a arte (sprite)',scope:'obj',fields:[{k:'asset',t:'asset',def:''}]},
+ {id:'impulsoCima',label:'impulso pra cima',scope:'obj',fields:[{k:'forca',t:'num',def:520}]},
+ {id:'escala',label:'mudar tamanho (escala)',scope:'obj',fields:[{k:'valor',t:'num',def:1}]},
+ {id:'teleportaAleatorio',label:'teleportar p/ lugar aleatório',scope:'obj'},
+ {id:'puxarPlayer',label:'puxar o player',scope:'obj',fields:[{k:'forca',t:'num',def:300}]},
+ {id:'curarPlayer',label:'curar o player',scope:'both',fields:[{k:'n',t:'num',def:1}]}
 ];
 function _ropt(list,val){ return list.map(o=>'<option value="'+esc(o.id)+'"'+(o.id===val?' selected':'')+'>'+esc(o.label)+'</option>').join(''); }
 function _rblk(list,id){ return list.find(b=>b.id===id)||list[0]; }
