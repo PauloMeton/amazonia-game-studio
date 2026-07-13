@@ -719,7 +719,7 @@ const BEH_DEF={
   'poder-tiro-carregado':{label:'Poder: tiro carregado (segurar J)',params:{tempo:0.6,velocidade:520}}
 };
 const BEH={
-  'player-platformer':(e,p,dt)=>{ const _bs=(RUN._buffSpd&&RUN.t<RUN._buffSpd.until)?RUN._buffSpd.mul:1,_bj=(RUN._buffJmp&&RUN.t<RUN._buffJmp.until)?RUN._buffJmp.mul:1; const sp=(+p.speed||200)*_bs, jp=(+p.jump||560)*_bj; e.vx=(Input.right?sp:0)-(Input.left?sp:0); e.vy+=SC.gravity*dt; if(Input.jump&&e.onGround){e.vy=-jp; playSnd('pulo');} moveE(e,dt);
+  'player-platformer':(e,p,dt)=>{ const _bs=(RUN._buffSpd&&RUN.t<RUN._buffSpd.until)?RUN._buffSpd.mul:1,_bj=(RUN._buffJmp&&RUN.t<RUN._buffJmp.until)?RUN._buffJmp.mul:1; const sp=(+p.speed||200)*_bs, jp=(+p.jump||560)*_bj; e.vx=(Input.right?sp:0)-(Input.left?sp:0); e.vy+=SC.gravity*dt; const _st=e.state; if(e.onGround)_st._coy=0.10; else _st._coy=(_st._coy||0)-dt; const _jd=Input.jump,_jw=_st._jw||false; _st._jw=_jd; if(_jd&&!_jw)_st._jb=0.12; else _st._jb=(_st._jb||0)-dt; if((_st._jb||0)>0&&(_st._coy||0)>0){ e.vy=-jp; _st._jb=0; _st._coy=0; e.onGround=false; playSnd('pulo'); } if(!_jd&&_jw&&e.vy<0)e.vy*=0.5; moveE(e,dt);
     if(e.vx<0)e.flip=true; else if(e.vx>0)e.flip=false; if(!hasAnimator(e))autoClip(e, !e.onGround?['pular','jump','idle']:(e.vx!==0?['correr','andar','andar-dir','walk']:['idle','parado'])); if(e.y>6000)respawn(e); },
   'player-topdown':(e,p,dt)=>{ const sp=+p.speed||160; let dx=(Input.right?1:0)-(Input.left?1:0), dy=(Input.down?1:0)-(Input.up?1:0); if(dx&&dy){dx*=Math.SQRT1_2;dy*=Math.SQRT1_2;} e.vx=dx*sp; e.vy=dy*sp; moveE(e,dt);
     let c; if(dy>0)c=['andar-baixo','andar','walk']; else if(dy<0)c=['andar-cima','andar','walk']; else if(dx>0){c=['andar-dir','andar','walk'];e.flip=false;} else if(dx<0){ if(hasClip(e,'andar-esq')){c=['andar-esq'];e.flip=false;}else{c=['andar-dir','andar','walk'];e.flip=true;} } else c=['idle','parado']; if(!hasAnimator(e))autoClip(e,c); },
@@ -1462,6 +1462,7 @@ function gameApi(dt){ if(RUN._gapi){ RUN._gapi.dt=dt; RUN._gapi.t=RUN.t; return 
   return RUN._gapi; }
 function drawHUD2(){ if(!RUN)return; cx.save(); cx.setTransform(1,0,0,1,0,0); cx.textBaseline='top';
   if(RUN._hud){ cx.font='14px system-ui'; const w=cx.measureText(RUN._hud).width+18; cx.fillStyle='rgba(0,0,0,.45)'; cx.fillRect(8,8,w,26); cx.fillStyle='#dff3e6'; cx.fillText(RUN._hud,17,13); }
+  { const pl=RUN.player; let info=''; if(pl&&pl.hp!=null)info+='\u2764 '+Math.max(0,Math.round(pl.hp))+'   '; info+='\u2b50 '+(RUN.score||0); cx.font='13px system-ui'; const iw=cx.measureText(info).width+16; cx.fillStyle='rgba(0,0,0,.4)'; cx.fillRect(cv.width-iw-8,8,iw,24); cx.fillStyle='#dff3e6'; cx.fillText(info,cv.width-iw,13); }
   if(RUN.over){ cx.fillStyle='rgba(0,0,0,.62)'; cx.fillRect(0,0,cv.width,cv.height); cx.textAlign='center'; cx.fillStyle=RUN.over==='win'?'#7FFFD4':'#ff6b6b'; cx.font='bold 36px system-ui'; cx.fillText(RUN.over==='win'?'VOCÊ VENCEU!':'FIM DE JOGO', cv.width/2, cv.height/2-28); cx.fillStyle='#dff3e6'; cx.font='15px system-ui'; cx.fillText('R = reiniciar • Esc = sair', cv.width/2, cv.height/2+14); cx.textAlign='left'; } cx.restore(); }
 function loop(now){ if(!RUN)return; const dt=Math.min(0.05,(now-RUN.last)/1000); RUN.last=now; RUN.t+=dt; RUN.dt=dt;
   try{
