@@ -109,9 +109,18 @@
     #panelBackdrop.on{display:block}
     #log{height:64px}
   }
+  @media (pointer:coarse){
+  button{min-height:38px}
+  select,input,textarea{min-height:36px}
+  .beh select,.beh input,#inRules select,#inRules input,#gRules select,#gRules input,#inRules b,.beh b{min-height:34px;font-size:13px!important;max-width:none!important}
+  .menu>.menupop button{min-height:44px}
+  }
+  #rotateHint{display:none;position:fixed;top:0;left:0;right:0;z-index:9500;background:#12251a;border-bottom:1px solid var(--accent);color:#dff3e6;font:12px system-ui;padding:6px 10px;align-items:center;gap:10px;justify-content:center}
+  @media (max-width:820px) and (orientation:portrait){ #rotateHint{display:flex} }
 </style>
 </head>
 <body>
+<div id="rotateHint">📱 Gire o celular para <b>paisagem</b> para editar melhor <button id="rotateHintX" style="min-height:0;padding:2px 10px">ok</button></div>
 <div id="authgate">
   <div class="auth-card">
     <div class="auth-logo">AMAZÔNIA Game Studio</div>
@@ -1505,18 +1514,19 @@ function setTool(t){ tool=t; buildTools(); g('toolHint').textContent=HINTS[t]||'
 /* ============ MOUSE NA CENA ============ */
 let drag=null;
 function evPos(e){ const r=cv.getBoundingClientRect(); return [e.clientX-r.left,e.clientY-r.top]; }
-cv.addEventListener('pointerdown',e=>{ if(RUN)return; cv.setPointerCapture(e.pointerId); const sp=evPos(e); const wp=s2w(sp[0],sp[1]);
+let _ptrs=new Map(),_pinch=null; cv.addEventListener('pointerdown',e=>{ if(RUN)return; _ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY}); if(_ptrs.size>=2){ drag=null; const _a=[..._ptrs.values()]; _pinch={d:Math.hypot(_a[0].x-_a[1].x,_a[0].y-_a[1].y)||1,z:cam.z}; return; } cv.setPointerCapture(e.pointerId); const sp=evPos(e); const wp=s2w(sp[0],sp[1]);
   if(tool==='pan'||e.button===1){ drag={t:'pan',sx:sp[0],sy:sp[1],cx:cam.x,cy:cam.y}; return; }
   if(tool==='tiles'){ const v=e.button===2?0:1; paintTile(wp[0],wp[1],v); drag={t:'paint',v:v}; return; }
   if(tool==='erase'){ paintTile(wp[0],wp[1],0); drag={t:'paint',v:0}; return; }
   if(tool==='place'){ if(!placeAsset){ logMsg('Escolha um objeto na biblioteca primeiro.'); return; } let px=wp[0],py=wp[1]; if(snap){px=Math.floor(wp[0]/SC.tile)*SC.tile;py=Math.floor(wp[1]/SC.tile)*SC.tile;} select(addEntity(placeAsset,px,py)); draw(); return; }
   let hit=null; for(let i=SC.entities.length-1;i>=0;i--){ const en=SC.entities[i],a=assetById(en.asset); const sw=(a?a.w:16)*SXof(en),sh=(a?a.h:16)*SYof(en); if(wp[0]>=en.x&&wp[0]<=en.x+sw&&wp[1]>=en.y&&wp[1]<=en.y+sh){hit=en;break;} }
   if(hit){ select(hit); drag={t:'move',ent:hit,ox:wp[0]-hit.x,oy:wp[1]-hit.y}; } else { select(null); drag={t:'pan',sx:sp[0],sy:sp[1],cx:cam.x,cy:cam.y}; } });
-cv.addEventListener('pointermove',e=>{ if(RUN||!drag)return; const sp=evPos(e); const wp=s2w(sp[0],sp[1]);
+cv.addEventListener('pointermove',e=>{ if(_pinch&&_ptrs.has(e.pointerId)){ _ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY}); if(_ptrs.size>=2){ const _a=[..._ptrs.values()]; const _d=Math.hypot(_a[0].x-_a[1].x,_a[0].y-_a[1].y)||1; cam.z=Math.max(.2,Math.min(6,_pinch.z*(_d/_pinch.d))); draw(); return; } } if(RUN||!drag)return; const sp=evPos(e); const wp=s2w(sp[0],sp[1]);
   if(drag.t==='pan'){ cam.x=drag.cx-(sp[0]-drag.sx)/cam.z; cam.y=drag.cy-(sp[1]-drag.sy)/cam.z; draw(); }
   else if(drag.t==='paint'){ paintTile(wp[0],wp[1],drag.v); }
   else if(drag.t==='move'){ let nx=wp[0]-drag.ox, ny=wp[1]-drag.oy; if(snap){ const s=SC.tile/2; nx=Math.round(nx/s)*s; ny=Math.round(ny/s)*s; } drag.ent.x=nx; drag.ent.y=ny; if(sel===drag.ent)syncInspPos(); draw(); } });
-cv.addEventListener('pointerup',()=>{ if(drag&&(drag.t==='move'||drag.t==='paint'))touch(); drag=null; });
+cv.addEventListener('pointerup',e=>{ if(e){_ptrs.delete(e.pointerId); if(_ptrs.size<2)_pinch=null;} if(drag&&(drag.t==='move'||drag.t==='paint'))touch(); drag=null; });
+cv.addEventListener('pointercancel',e=>{ if(e){_ptrs.delete(e.pointerId); if(_ptrs.size<2)_pinch=null;} });
 cv.addEventListener('contextmenu',e=>e.preventDefault());
 cv.addEventListener('wheel',e=>{ if(RUN)return; e.preventDefault(); const sp=evPos(e); const wp=s2w(sp[0],sp[1]); cam.z=Math.max(.2,Math.min(6,cam.z*(e.deltaY<0?1.1:0.9))); const np=w2s(wp[0],wp[1]); cam.x+=(np[0]-sp[0])/cam.z; cam.y+=(np[1]-sp[1])/cam.z; draw(); },{passive:false});
 function paintTile(wx,wy,v){ const k=Math.floor(wx/SC.tile)+','+Math.floor(wy/SC.tile); if(v)SC.grid[k]=1; else delete SC.grid[k]; draw(); }
@@ -2249,6 +2259,7 @@ function wire(){ buildTools(); setTool('select');
   g('cenaDel').onclick=()=>{ if(Cena.sel>=0){ Cena.boxes.splice(Cena.sel,1); Cena.sel=-1; cenaInvalidatePreview(); cenaRenderPalette(); cenaDraw(); } };
   g('cenaGen').onclick=cenaGenerate; g('cenaAI').onclick=cenaAI; if(g('cenaPrev'))g('cenaPrev').onclick=cenaPreview;
   if(g('cenaDesc'))g('cenaDesc').oninput=()=>{ Cena.descEdited=true; };
+  if(g('rotateHintX'))g('rotateHintX').onclick=()=>{ g('rotateHint').style.display='none'; };
   if(g('tglLeft'))g('tglLeft').onclick=()=>togglePanel('left');
   if(g('tglRight'))g('tglRight').onclick=()=>togglePanel('right');
   if(g('panelBackdrop'))g('panelBackdrop').onclick=closePanels;
@@ -2265,7 +2276,7 @@ function wire(){ buildTools(); setTool('select');
   if(g('welcomeStart'))g('welcomeStart').onclick=()=>{ g('welcomeModal').classList.remove('open'); _wflag(); };
   if(g('welcomeTut'))g('welcomeTut').onclick=()=>{ g('welcomeModal').classList.remove('open'); _wflag(); openTutorial(); };
   if(g('welcomeExample'))g('welcomeExample').onclick=()=>{ g('welcomeModal').classList.remove('open'); _wflag(); try{ loadProject(exampleProject('platformer')); toast('Exemplo carregado — clique em ▶ Jogar!'); }catch(e){ logMsg('Erro ao carregar exemplo: '+e.message); } };
-  (function(){ const cv=g('cenaCanvas'); if(cv){ cv.addEventListener('mousedown',e=>cenaMouse(e,'down')); window.addEventListener('mousemove',e=>{ if(Cena.drag)cenaMouse(e,'move'); }); window.addEventListener('mouseup',e=>{ if(Cena.drag)cenaMouse(e,'up'); }); } })();
+  (function(){ const cv=g('cenaCanvas'); if(cv){ cv.addEventListener('pointerdown',e=>cenaMouse(e,'down')); window.addEventListener('pointermove',e=>{ if(Cena.drag)cenaMouse(e,'move'); }); window.addEventListener('pointerup',e=>{ if(Cena.drag)cenaMouse(e,'up'); }); } })();
   g('genRun').onclick=()=>gerarJogo(); g('genIn').addEventListener('keydown',e=>{ if(e.key==='Enter')gerarJogo(); });
   document.querySelectorAll('.genPre').forEach(b=>b.onclick=()=>{ g('genIn').value=b.dataset.d; gerarJogo(); });
   g('loadCoursePlat').onclick=()=>loadCourse('platformer'); g('loadCourseTop').onclick=()=>loadCourse('topdown');
