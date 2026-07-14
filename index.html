@@ -972,7 +972,7 @@ function apiFor(e){ if(e._api){return e._api;} const s=e; e._api={
     get x(){return s.x;}, set x(v){s.x=v;}, get y(){return s.y;}, set y(v){s.y=v;},
     get vx(){return s.vx;}, set vx(v){s.vx=v;}, get vy(){return s.vy;}, set vy(v){s.vy=v;},
     get w(){return s.w;}, get h(){return s.h;}, get onGround(){return s.onGround;}, get name(){return s.name;},
-    get flip(){return s.flip;}, set flip(v){s.flip=v;}, state:s.state, input:Input, gravity:SC.gravity, mode:SC.mode, tile:SC.tile,
+    get flip(){return s.flip;}, set flip(v){s.flip=v;}, get hp(){return s.hp;}, set hp(v){s.hp=v;}, state:s.state, input:Input, gravity:SC.gravity, mode:SC.mode, tile:SC.tile,
     move(){ moveE(s,RUN.dt); }, play(c){ if(hasClip(s,c)&&s.clip!==c){s.clip=c;s._t=0;} },
     solidAt(wx,wy){ return solid(Math.floor(wx/SC.tile),Math.floor(wy/SC.tile)); },
     find(nm){ return RUN.ents.find(z=>z.name===nm&&!z.dead)&&RUN.ents.find(z=>z.name===nm&&!z.dead)._api; },
