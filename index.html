@@ -1850,6 +1850,58 @@ const TUT=[
 let _tut=0;
 function tutShow(i){ _tut=Math.max(0,Math.min(TUT.length-1,i)); const s=TUT[_tut]; if(g('tutTitle'))g('tutTitle').textContent=s.t; if(g('tutBody'))g('tutBody').innerHTML=s.h; const b=g('tutAction'); if(b){ if(s.btn){ b.style.display=''; b.textContent=s.btn[0]; b.onclick=s.btn[1]; } else b.style.display='none'; } if(g('tutStep'))g('tutStep').textContent=(_tut+1)+' / '+TUT.length; if(g('tutPrev'))g('tutPrev').style.visibility=_tut>0?'visible':'hidden'; if(g('tutNext'))g('tutNext').textContent=_tut<TUT.length-1?'Próximo ▸':'Concluir'; }
 function openTutorial(){ g('tutModal').classList.add('open'); tutShow(0); }
+
+function _tplBase(nm){ return {v:2,name:nm,cur:0,target:'desktop',touchctl:'auto',camZoom:1,assets:[{id:'hero',name:'heroi',raw:makeHero()},{id:'coin',name:'moeda',raw:makeCoin()},{id:'enemy',name:'inimigo',raw:makeEnemy()},{id:'bala',name:'bala',raw:makeBullet()}]}; }
+function tplProject(kind){ const T=32; const proj=_tplBase('modelo-'+kind); const grid={}; const E=[]; let mode='platformer',gravity=1800;
+  const ent=(id,nm,x,y,asset,beh,sx,sy)=>({id:id,name:nm,x:x,y:y,asset:asset,clip:'idle',sx:sx||2,sy:sy||2,fps:8,flip:false,layer:'L2',behaviors:beh,script:'',faceMode:'auto'});
+  const an=()=>({type:'animator',params:{parado:'idle',andando:'andar'}});
+  if(kind==='mario'){ for(let c=0;c<40;c++)grid[c+',12']=1; ['9,9','10,9','11,9','16,7','17,7'].forEach(k=>grid[k]=1);
+    E.push(ent('p','heroi',60,330,'hero',[{type:'player-platformer',params:{speed:200,jump:560}},an()]));
+    E.push(ent('c1','moeda',9*T+8,8*T,'coin',[{type:'collectible',params:{value:1}}]));
+    E.push(ent('c2','moeda',16*T+8,6*T,'coin',[{type:'collectible',params:{value:1}}]));
+    E.push(ent('tr','moeda',6*T,11*T,'coin',[{type:'trampolim',params:{forca:820}}]));
+    E.push(ent('mv','moeda',22*T,10*T,'coin',[{type:'plataforma-h',params:{velocidade:70,distancia:96}}]));
+    E.push(ent('en','inimigo',28*T,11*T,'enemy',[{type:'inimigo-patrulha',params:{vida:2,velocidade:60,distancia:96}},an()]));
+  } else if(kind==='hollow'){ for(let c=0;c<40;c++)grid[c+',12']=1; for(let r=5;r<12;r++){grid['20,'+r]=1;grid['0,'+r]=1;}
+    E.push(ent('p','heroi',60,330,'hero',[{type:'player-platformer',params:{speed:210,jump:520}},an(),{type:'poder-pulo-duplo',params:{forca:500,extras:1}},{type:'poder-dash',params:{tecla:'ShiftLeft',forca:600,cd:0.7}},{type:'poder-parede',params:{forca:520,impulso:280,desliza:90}},{type:'arma-espada',params:{alcance:40,dano:1,cadencia:0.35}}]));
+    E.push(ent('cp','moeda',12*T,11*T,'coin',[{type:'checkpoint',params:{}}]));
+    E.push(ent('en','inimigo',15*T,11*T,'enemy',[{type:'inimigo-persegue',params:{vida:3,velocidade:70}},an()]));
+    E.push(ent('bo','chefe',34*T,10*T,'hero',[{type:'boss',params:{vida:10,velocidade:50,cadencia:1.4,velocidadeBala:240}},an()],3,3));
+  } else if(kind==='megaman'){ for(let c=0;c<40;c++)grid[c+',12']=1; ['10,9','11,9','18,8','19,8'].forEach(k=>grid[k]=1);
+    E.push(ent('p','heroi',60,330,'hero',[{type:'player-platformer',params:{speed:200,jump:540}},an(),{type:'arma-tiro',params:{velocidade:400,cadencia:0.3}}]));
+    E.push(ent('e1','inimigo',14*T,11*T,'enemy',[{type:'inimigo-pula',params:{vida:2,velocidade:60,distancia:100,forca:480,intervalo:1.4}},an()]));
+    E.push(ent('bo','chefe',34*T,10*T,'hero',[{type:'boss',params:{vida:12,velocidade:45,cadencia:1.3,velocidadeBala:260}},an()],3,3));
+  } else if(kind==='zelda'){ mode='topdown'; gravity=0; for(let c=2;c<=23;c++){grid[c+',2']=1;grid[c+',15']=1;} for(let r=2;r<=15;r++){grid['2,'+r]=1;grid['23,'+r]=1;}
+    E.push(ent('p','heroi',6*T,8*T,'hero',[{type:'player-topdown',params:{speed:160}},an(),{type:'arma-espada',params:{alcance:36,dano:1,cadencia:0.35}}]));
+    E.push(ent('k','chave',12*T,5*T,'coin',[{type:'chave',params:{}}]));
+    E.push(ent('sd','saida',21*T,13*T,'hero',[{type:'saida-chaves',params:{chaves:1}}]));
+    E.push(ent('bl','bloco',15*T,9*T,'coin',[{type:'empurravel',params:{velocidade:70}}]));
+    E.push(ent('np','npc',8*T,4*T,'hero',[{type:'npc',params:{texto:'Pegue a chave e ache a saida!'}}]));
+    E.push(ent('en','inimigo',17*T,7*T,'enemy',[{type:'inimigo-persegue',params:{vida:2,velocidade:80}},an()]));
+  } else if(kind==='soulknight'){ mode='topdown'; gravity=0; for(let c=2;c<=23;c++){grid[c+',2']=1;grid[c+',15']=1;} for(let r=2;r<=15;r++){grid['2,'+r]=1;grid['23,'+r]=1;}
+    E.push(ent('p','heroi',12*T,8*T,'hero',[{type:'player-topdown',params:{speed:170}},an(),{type:'arma-mira-cursor',params:{velocidade:420,cadencia:0.25}}]));
+    E.push(ent('e1','inimigo',6*T,5*T,'enemy',[{type:'inimigo-persegue',params:{vida:2,velocidade:80}},an()]));
+    E.push(ent('e2','inimigo',18*T,6*T,'enemy',[{type:'inimigo-persegue',params:{vida:2,velocidade:80}},an()]));
+    E.push(ent('e3','inimigo',12*T,13*T,'enemy',[{type:'inimigo-cacador',params:{vida:2,velocidade:70,alcance:280,cadencia:1,velocidadeBala:280}},an()]));
+    E.push(ent('c1','moeda',18*T,10*T,'coin',[{type:'collectible',params:{value:1}}]));
+  }
+  const scene={name:'fase 1',mode:mode,tile:T,gravity:gravity,bg:'#0a0f0c',tileColor:'#3a5d44',bgImage:'',bgW:0,bgH:0,bgLayers:[],grid:grid,layers:[{id:'L1',name:'Cenario',visible:true},{id:'L2',name:'Objetos',visible:true}],active:'L2',globalScript:'',globalRules:[{w:{id:'sempre'},a:{id:'mostrarPlacar'}}],entities:E};
+  proj.scenes=[scene]; return proj; }
+const TEMPLATES=[
+ {key:'vazio',emoji:'➕',title:'Comecar do zero',ref:'projeto vazio',mode:'—',mechs:['So um chao. Voce monta tudo do jeito que quiser.']},
+ {key:'mario',emoji:'🍄',title:'Plataforma classica',ref:'tipo Super Mario',mode:'Plataforma',mechs:['Pulo com bom feel (coyote/buffer)','Moedas para o placar','Inimigo que patrulha','Plataforma movel + trampolim']},
+ {key:'hollow',emoji:'⚔️',title:'Metroidvania',ref:'tipo Hollow Knight',mode:'Plataforma',mechs:['Dash + pulo duplo','Pulo na parede (wall jump)','Espada corpo a corpo','Chefe + checkpoint']},
+ {key:'megaman',emoji:'🔫',title:'Tiro lateral (run and gun)',ref:'tipo Mega Man',mode:'Plataforma',mechs:['Tiro reto no J','Inimigos que pulam','Chefe com vida alta','Plataformas para pular']},
+ {key:'zelda',emoji:'🗺️',title:'Aventura top-down',ref:'tipo Zelda',mode:'Top-down',mechs:['Espada','Chave + porta de saida','Bloco empurravel (puzzle)','NPC com fala + inimigos']},
+ {key:'soulknight',emoji:'🎯',title:'Roguelite de tiro',ref:'tipo Soul Knight',mode:'Top-down',mechs:['Mira no cursor (twin-stick)','Sala fechada com inimigos','Inimigo cacador que atira','Moedas']},
+ {key:'3d',emoji:'🧊',title:'3D em 1a pessoa',ref:'modulo a parte (beta)',mode:'3D',mechs:['Abre o construtor de Jogo 3D']}
+];
+function renderNewCards(){ const w=g('newList'); if(!w)return; w.innerHTML=''; TEMPLATES.forEach(t=>{ const d=document.createElement('div'); d.style.cssText='border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;background:#0c1610;display:flex;flex-direction:column;gap:5px;transition:border-color .15s'; d.onmouseenter=()=>d.style.borderColor='var(--accent)'; d.onmouseleave=()=>d.style.borderColor='var(--line)';
+   d.innerHTML='<div style="font-weight:bold;color:var(--accent);font-size:14px">'+t.emoji+' '+esc(t.title)+'</div><div class="note" style="color:var(--accent2);font-size:11px">Referencia: '+esc(t.ref)+' • '+esc(t.mode)+'</div><ul style="margin:3px 0 0 16px;font-size:11px;color:var(--txt);line-height:1.4;padding:0">'+t.mechs.map(m=>'<li>'+esc(m)+'</li>').join('')+'</ul>';
+   d.onclick=()=>chooseTemplate(t.key); w.appendChild(d); }); }
+function openNewModal(){ renderNewCards(); g('newTplModal').classList.add('open'); }
+function chooseTemplate(k){ confirmDialog('Criar um novo projeto com esse modelo? O projeto atual fica salvo localmente ate voce salvar de novo.').then(ok=>{ if(!ok)return; g('newTplModal').classList.remove('open'); try{ if(k==='3d'){ openG3d(); return; } if(k==='vazio'){ loadProject(newProject()); } else { loadProject(tplProject(k)); } touch(); toast('Modelo criado! Clique em ▶ Jogar para testar.'); }catch(e){ logMsg('Erro: '+e.message); } }); }
+
 function tutAddEnemy(){ try{ let a=PR.assets.find(x=>x.id==='enemy'||x.name==='inimigo'); if(!a)a=addAsset(makeEnemy(),'inimigo'); const pl=SC.entities.find(e=>(e.behaviors||[]).some(b=>b.type==='player-platformer'||b.type==='player-topdown')); const px=pl?pl.x:200, py=pl?pl.y:200; const e=addEntity(a.id, px+220, py-40); e.behaviors=[{type:'inimigo-patrulha',params:{vida:2,velocidade:60,distancia:96}},{type:'animator',params:{parado:'idle',andando:'andar'}}]; select(e); draw(); touch(); toast('Inimigo adicionado! Ele anda de um lado ao outro.'); }catch(err){ logMsg('Erro: '+err.message); } }
 
 /* ============ EDITOR DE ARTE (módulo) ============ */
@@ -2208,7 +2260,7 @@ function wire(){ buildTools(); setTool('select');
   g('artsLocalBtn').onclick=()=>{ try{ const r=localStorage.getItem('px_proj'); if(!r){logMsg('Nada encontrado do Pixel Studio neste navegador.');return;} importArt(projFromAny(JSON.parse(r)),'pixel-studio'); }catch(e){ logMsg('Erro ao ler local: '+e.message); } };
   g('artsFileBtn').onclick=()=>g('fileArt').click();
   g('fileArt').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{ importArt(projFromAny(JSON.parse(r.result)), f.name.replace(/\.json$/,'')); }catch(x){ logMsg('JSON inválido.'); } }; r.readAsText(f); e.target.value=''; };
-  g('btnNew').onclick=()=>{ confirmDialog('Começar um projeto novo? (o atual fica salvo localmente)').then(ok=>{ if(ok){ loadProject(newProject()); touch(); } }); };
+  g('btnNew').onclick=openNewModal; if(g('newTplClose'))g('newTplClose').onclick=()=>g('newTplModal').classList.remove('open');
   g('btnExportJson').onclick=()=>{ const blob=new Blob([JSON.stringify(serializeProject())],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(PR.name||'projeto')+'.json'; a.click(); };
   g('btnOpenJson').onclick=()=>g('fileScene').click();
   g('fileScene').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{ loadProject(JSON.parse(r.result)); logMsg('Projeto carregado.'); }catch(x){ logMsg('JSON inválido.'); } }; r.readAsText(f); e.target.value=''; };
@@ -2361,6 +2413,13 @@ if(this.score>=20) this.win();</textarea>
     <div class="row" style="justify-content:space-between"><div class="auth-logo" style="margin:0;font-size:1.05em">🖼️ Biblioteca de artes</div><button id="artLibClose">fechar</button></div>
     <p class="note">Clique numa arte para adicioná-la à sua biblioteca de objetos. Depois use a ferramenta <b>＋ Colocar</b> para pôr na cena.</p>
     <div id="artLibList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px"></div>
+  </div>
+</div>
+<div id="newTplModal" class="modal">
+  <div class="auth-card" style="width:760px;max-width:96%;max-height:90%;overflow:auto;gap:10px;text-align:left">
+    <div class="row" style="justify-content:space-between"><div class="auth-logo" style="margin:0;font-size:1.15em">🎮 Escolha um tipo de jogo</div><button id="newTplClose">fechar</button></div>
+    <p class="note">Cada modelo ja vem montado com as mecanicas nativas daquele estilo. Escolha um para comecar (ou "Comecar do zero").</p>
+    <div id="newList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px"></div>
   </div>
 </div>
 </body>
