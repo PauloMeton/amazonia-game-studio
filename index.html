@@ -1434,11 +1434,11 @@ function renderRuleEditor(host, rules, isGlobal, ctx){ if(!host)return; ctx=ctx|
   rules.forEach((r,idx)=>{ const row=document.createElement('div'); row.style.cssText='border:1px solid var(--line);border-radius:6px;padding:5px;margin-bottom:5px;background:#0c1610';
     const l1=document.createElement('div'); l1.style.cssText='display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin-bottom:4px';
     const q=document.createElement('b'); q.textContent='Quando'; q.style.cssText='color:var(--accent2);font-size:11px'; l1.appendChild(q);
-    const ws=document.createElement('select'); ws.innerHTML=_optGroups(whenL,r.w.id,WHEN_CATS); ws.style.cssText='font-size:11px;padding:2px 4px;max-width:170px'; ws.onchange=()=>{ r.w={id:ws.value}; touch(); renderRuleEditor(host,rules,isGlobal,ctx); }; l1.appendChild(ws);
+    const ws=document.createElement('button'); ws.textContent=(_rblk(whenL,r.w.id).label||'escolher…'); ws.style.cssText='font-size:11px;padding:3px 8px;max-width:200px;text-align:left;white-space:normal'; ws.onclick=()=>openPicker('Quando…', whenL.map(o=>({id:o.id,label:o.label,desc:(typeof RDESC!=='undefined'?RDESC[o.id]:'')||''})), WHEN_CATS, (id)=>{ r.w={id:id}; touch(); renderRuleEditor(host,rules,isGlobal,ctx); }); l1.appendChild(ws);
     (_rblk(whenL,r.w.id).fields||[]).forEach(def=>l1.appendChild(_rfield(def,r.w,ctx)));
     const l2=document.createElement('div'); l2.style.cssText='display:flex;flex-wrap:wrap;align-items:center;gap:3px';
     const f=document.createElement('b'); f.textContent='→ Faça'; f.style.cssText='color:var(--accent);font-size:11px'; l2.appendChild(f);
-    const as=document.createElement('select'); as.innerHTML=_optGroups(actL,r.a.id,ACT_CATS); as.style.cssText='font-size:11px;padding:2px 4px;max-width:170px'; as.onchange=()=>{ r.a={id:as.value}; touch(); renderRuleEditor(host,rules,isGlobal,ctx); }; l2.appendChild(as);
+    const as=document.createElement('button'); as.textContent=(_rblk(actL,r.a.id).label||'escolher…'); as.style.cssText='font-size:11px;padding:3px 8px;max-width:200px;text-align:left;white-space:normal'; as.onclick=()=>openPicker('Faça…', actL.map(o=>({id:o.id,label:o.label,desc:(typeof RDESC!=='undefined'?RDESC[o.id]:'')||''})), ACT_CATS, (id)=>{ r.a={id:id}; touch(); renderRuleEditor(host,rules,isGlobal,ctx); }); l2.appendChild(as);
     (_rblk(actL,r.a.id).fields||[]).forEach(def=>l2.appendChild(_rfield(def,r.a,ctx)));
     const rm=document.createElement('button'); rm.textContent='✕'; rm.className='danger'; rm.style.cssText='padding:1px 6px;font-size:11px;margin-left:auto'; rm.onclick=()=>{ rules.splice(idx,1); touch(); renderRuleEditor(host,rules,isGlobal,ctx); }; l2.appendChild(rm);
     row.appendChild(l1); row.appendChild(l2); { const dw=RDESC[r.w.id],da=RDESC[r.a.id]; if(dw||da){ const dn=document.createElement('div'); dn.className='note'; dn.style.cssText='font-size:10px;margin-top:3px;opacity:.85'; dn.textContent=(dw?('▸ '+dw):'')+(dw&&da?'   ':'')+(da?('→ '+da):''); row.appendChild(dn); } } host.appendChild(row); });
@@ -1576,7 +1576,7 @@ function refreshInspector(){ const w=g('insp'); if(!sel){ w.innerHTML='<p class=
   h+='<label style="margin-top:6px">Direção da arte (no jogo)</label><select id="inFace"><option value="auto"'+((sel.faceMode||'auto')==='auto'?' selected':'')+'>Espelhar ao andar (arte olha p/ direita)</option><option value="left"'+(sel.faceMode==='left'?' selected':'')+'>Arte olha p/ esquerda (não inverter)</option><option value="lock"'+(sel.faceMode==='lock'?' selected':'')+'>Nunca espelhar</option></select>';
   h+='<label style="margin-top:6px">Camada</label><select id="inLayer">'+SC.layers.map((L,i)=>'<option value="'+L.id+'"'+((sel.layer||SC.active)===L.id?' selected':'')+'>'+(i+1)+' · '+esc(L.name)+'</option>').join('')+'</select>';
   h+='<h3 style="margin-top:10px;color:var(--accent2);font-size:11px;text-transform:uppercase">Comportamentos</h3><div id="behs"></div>';
-  h+='<div class="row" style="margin-top:4px"><select id="behAdd"><option value="">+ adicionar comportamento...</option>'+_optGroups(Object.keys(BEH_DEF).filter(_behForMode).map(k=>({id:k,label:BEH_DEF[k].label})),'',BEH_CATS)+'</select></div>';
+  h+='<div class="row" style="margin-top:4px"><button id="behAddBtn" class="primary" style="width:100%">+ adicionar comportamento…</button></div>';
   h+='<h3 style="margin-top:10px;color:var(--accent);font-size:11px;text-transform:uppercase">🧩 Regras — Quando → Faça (sem código)</h3><div id="inRules"></div>';
   h+='<h3 style="margin-top:10px;color:var(--accent2);font-size:11px;text-transform:uppercase">Script (JS) — avançado</h3>';
   h+='<div class="row"><input id="aiCodePrompt" placeholder="descreva: ex: persegue o player e pula"><button id="aiCodeGen" class="primary" style="white-space:nowrap">✨ IA</button></div>';
@@ -1593,9 +1593,7 @@ function refreshInspector(){ const w=g('insp'); if(!sel){ w.innerHTML='<p class=
   g('inSY').oninput=e=>{ const v=Math.max(.1,+e.target.value||1); sel.sy=v; delete sel.scale; if(g('inLockScale').checked){ sel.sx=v; g('inSX').value=v; } draw(); touch(); };
   g('inFps').oninput=e=>{sel.fps=Math.max(1,+e.target.value||10);touch();};
   g('inClip').onchange=e=>{sel.clip=e.target.value;draw();touch();}; g('inFlip').onchange=e=>{sel.flip=e.target.checked;draw();touch();}; g('inFace').onchange=e=>{sel.faceMode=e.target.value;draw();touch();}; g('inLayer').onchange=e=>{sel.layer=e.target.value;draw();touch();};
-  g('behAdd').onchange=e=>{ const tp=e.target.value; if(!tp)return; const params=JSON.parse(JSON.stringify(BEH_DEF[tp].params||{}));
-    if(tp==='flow'){ const a=assetById(sel.asset); if(a){ params.nodes=a.clipNames.map((c,k)=>({id:'n'+k+'_'+uid(),clip:c,x:40+(k%4)*160,y:50+Math.floor(k/4)*90})); params.start=params.nodes[0]?params.nodes[0].id:''; } }
-    sel.behaviors.push({type:tp,params:params}); refreshInspector(); touch(); };
+  if(g('behAddBtn'))g('behAddBtn').onclick=()=>openPicker('Adicionar comportamento', Object.keys(BEH_DEF).filter(_behForMode).map(k=>({id:k,label:BEH_DEF[k].label,desc:(typeof BDESC!=='undefined'?BDESC[k]:'')||''})), BEH_CATS, (tp)=>{ const params=JSON.parse(JSON.stringify(BEH_DEF[tp].params||{})); if(tp==='flow'){ const a=assetById(sel.asset); if(a){ params.nodes=a.clipNames.map((c,k)=>({id:'n'+k+'_'+uid(),clip:c,x:40+(k%4)*160,y:50+Math.floor(k/4)*90})); params.start=params.nodes[0]?params.nodes[0].id:''; } } sel.behaviors.push({type:tp,params:params}); refreshInspector(); touch(); });
   g('inApplyScript').onclick=()=>{ sel.script=g('inScript').value; try{ if(sel.script.trim())new Function('dt',sel.script); logMsg('Script de "'+sel.name+'" salvo.'); }catch(err){ logMsg('⚠ Erro no script: '+err.message); } touch(); };
   g('aiCodeGen').onclick=()=>AICode.gen(); g('aiCodeEx').onchange=e=>AICode.ex(e.target.value);
   g('inDel').onclick=()=>{ SC.entities=SC.entities.filter(z=>z!==sel); select(null); touch(); };
@@ -1899,7 +1897,10 @@ const TEMPLATES=[
 function renderNewCards(){ const w=g('newList'); if(!w)return; w.innerHTML=''; TEMPLATES.forEach(t=>{ const d=document.createElement('div'); d.style.cssText='border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;background:#0c1610;display:flex;flex-direction:column;gap:5px;transition:border-color .15s'; d.onmouseenter=()=>d.style.borderColor='var(--accent)'; d.onmouseleave=()=>d.style.borderColor='var(--line)';
    d.innerHTML='<div style="font-weight:bold;color:var(--accent);font-size:14px">'+t.emoji+' '+esc(t.title)+'</div><div class="note" style="color:var(--accent2);font-size:11px">Referencia: '+esc(t.ref)+' • '+esc(t.mode)+'</div><ul style="margin:3px 0 0 16px;font-size:11px;color:var(--txt);line-height:1.4;padding:0">'+t.mechs.map(m=>'<li>'+esc(m)+'</li>').join('')+'</ul>';
    d.onclick=()=>chooseTemplate(t.key); w.appendChild(d); }); }
+
 function openNewModal(){ renderNewCards(); g('newTplModal').classList.add('open'); }
+function _pickRender(items,cats,filter,onPick){ const w=g('pickerList'); if(!w)return; w.innerHTML=''; const f=(filter||'').toLowerCase().trim(); const byId={}; items.forEach(o=>byId[o.id]=o); const used={}; const groups=[]; (cats||[]).forEach(c=>{ const list=c[1].filter(id=>byId[id]).map(id=>{used[id]=1;return byId[id];}); if(list.length)groups.push([c[0],list]); }); const rest=items.filter(o=>!used[o.id]); if(rest.length)groups.push(['Outros',rest]); let any=false; groups.forEach(gp=>{ const vis=gp[1].filter(o=>!f||(o.label+' '+(o.desc||'')).toLowerCase().indexOf(f)>=0); if(!vis.length)return; any=true; const h=document.createElement('div'); h.style.cssText='margin:8px 0 3px;color:var(--accent2);font-weight:bold;font-size:11px;text-transform:uppercase'; h.textContent=gp[0]; w.appendChild(h); const grid=document.createElement('div'); grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px'; vis.forEach(o=>{ const d=document.createElement('div'); d.style.cssText='border:1px solid var(--line);border-radius:8px;padding:7px;cursor:pointer;background:#0c1610'; d.onmouseenter=()=>d.style.borderColor='var(--accent)'; d.onmouseleave=()=>d.style.borderColor='var(--line)'; d.innerHTML='<div style="font-weight:bold;font-size:12px">'+esc(o.label)+'</div>'+(o.desc?'<div class="note" style="font-size:10px;line-height:1.3;margin-top:2px">'+esc(o.desc)+'</div>':''); d.onclick=()=>{ g('pickerModal').classList.remove('open'); onPick(o.id); }; grid.appendChild(d); }); w.appendChild(grid); }); if(!any)w.innerHTML='<p class="note">Nada encontrado.</p>'; }
+function openPicker(title,items,cats,onPick){ g('pickerTitle').textContent=title; const inp=g('pickerSearch'); inp.value=''; _pickRender(items,cats,'',onPick); inp.oninput=()=>_pickRender(items,cats,inp.value,onPick); g('pickerModal').classList.add('open'); setTimeout(()=>{try{inp.focus();}catch(e){}},60); }
 function chooseTemplate(k){ confirmDialog('Criar um novo projeto com esse modelo? O projeto atual fica salvo localmente ate voce salvar de novo.').then(ok=>{ if(!ok)return; g('newTplModal').classList.remove('open'); try{ if(k==='3d'){ openG3d(); return; } if(k==='vazio'){ loadProject(newProject()); } else { loadProject(tplProject(k)); } touch(); toast('Modelo criado! Clique em ▶ Jogar para testar.'); }catch(e){ logMsg('Erro: '+e.message); } }); }
 
 function tutAddEnemy(){ try{ let a=PR.assets.find(x=>x.id==='enemy'||x.name==='inimigo'); if(!a)a=addAsset(makeEnemy(),'inimigo'); const pl=SC.entities.find(e=>(e.behaviors||[]).some(b=>b.type==='player-platformer'||b.type==='player-topdown')); const px=pl?pl.x:200, py=pl?pl.y:200; const e=addEntity(a.id, px+220, py-40); e.behaviors=[{type:'inimigo-patrulha',params:{vida:2,velocidade:60,distancia:96}},{type:'animator',params:{parado:'idle',andando:'andar'}}]; select(e); draw(); touch(); toast('Inimigo adicionado! Ele anda de um lado ao outro.'); }catch(err){ logMsg('Erro: '+err.message); } }
@@ -2260,7 +2261,7 @@ function wire(){ buildTools(); setTool('select');
   g('artsLocalBtn').onclick=()=>{ try{ const r=localStorage.getItem('px_proj'); if(!r){logMsg('Nada encontrado do Pixel Studio neste navegador.');return;} importArt(projFromAny(JSON.parse(r)),'pixel-studio'); }catch(e){ logMsg('Erro ao ler local: '+e.message); } };
   g('artsFileBtn').onclick=()=>g('fileArt').click();
   g('fileArt').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{ importArt(projFromAny(JSON.parse(r.result)), f.name.replace(/\.json$/,'')); }catch(x){ logMsg('JSON inválido.'); } }; r.readAsText(f); e.target.value=''; };
-  g('btnNew').onclick=openNewModal; if(g('newTplClose'))g('newTplClose').onclick=()=>g('newTplModal').classList.remove('open');
+  g('btnNew').onclick=openNewModal; if(g('newTplClose'))g('newTplClose').onclick=()=>g('newTplModal').classList.remove('open'); if(g('pickerClose'))g('pickerClose').onclick=()=>g('pickerModal').classList.remove('open');
   g('btnExportJson').onclick=()=>{ const blob=new Blob([JSON.stringify(serializeProject())],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(PR.name||'projeto')+'.json'; a.click(); };
   g('btnOpenJson').onclick=()=>g('fileScene').click();
   g('fileScene').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{ loadProject(JSON.parse(r.result)); logMsg('Projeto carregado.'); }catch(x){ logMsg('JSON inválido.'); } }; r.readAsText(f); e.target.value=''; };
@@ -2420,6 +2421,13 @@ if(this.score>=20) this.win();</textarea>
     <div class="row" style="justify-content:space-between"><div class="auth-logo" style="margin:0;font-size:1.15em">🎮 Escolha um tipo de jogo</div><button id="newTplClose">fechar</button></div>
     <p class="note">Cada modelo ja vem montado com as mecanicas nativas daquele estilo. Escolha um para comecar (ou "Comecar do zero").</p>
     <div id="newList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px"></div>
+  </div>
+</div>
+<div id="pickerModal" class="modal" style="z-index:22000">
+  <div class="auth-card" style="width:720px;max-width:96%;max-height:88%;overflow:auto;gap:8px;text-align:left">
+    <div class="row" style="justify-content:space-between"><div class="auth-logo" id="pickerTitle" style="margin:0;font-size:1.05em">Escolher</div><button id="pickerClose">fechar</button></div>
+    <input id="pickerSearch" placeholder="🔎 buscar por nome ou descrição…" style="width:100%">
+    <div id="pickerList"></div>
   </div>
 </div>
 </body>
