@@ -392,6 +392,7 @@ if(this.enemies().length===0) this.win();"></textarea>
           <div><label>Cor do tile</label><input type="color" id="tileColor" value="#3a5d44"></div>
         </div>
         <label class="row" style="margin-top:6px;font-size:11px;color:var(--muted)"><input type="checkbox" id="soundChk" checked> &nbsp;🔊 Som (efeitos)</label>
+        <label class="row" style="margin-top:4px;font-size:11px;color:var(--muted)"><input type="checkbox" id="musicChk"> &nbsp;🎵 Música de fundo</label>
       </div>
 
       <div class="card"><h3>Mobile / Alvo</h3>
@@ -1463,6 +1464,7 @@ function startPlay(){ if(RUN)return; if(!SC.entities.length){ logMsg('Adicione a
   if(_carry){ if(RUN.player&&_carry.hp!=null)RUN.player.hp=_carry.hp; RUN.score=_carry.score||0; RUN._gstate=_carry.gstate||{}; _carry=null; }
   if(!RUN.player) logMsg('Dica: nenhum objeto tem comportamento de Player. Selecione um objeto e adicione "Player Plataforma" ou "Player Top-down" para controlá-lo e a câmera segui-lo.');
   if(SC.mode==='platformer' && RUN.player && (!SC.grid||Object.keys(SC.grid).length===0)) logMsg('⚠ Esta cena não tem chão — o player vai cair sem parar. Use a ferramenta "▦ Plataforma" para desenhar o chão embaixo dele.');
+  if(PR.music){try{startMusic();}catch(e){}}
   g('btnPlay').classList.add('hide'); g('btnStop').classList.remove('hide');
   editZoom=cam.z; cam.z=PR.camZoom||1; try{ const _c=_ac(); if(_c&&_c.state==='suspended')_c.resume(); }catch(e){}
   if(shouldShowTouch())Touch.show(g('stage'));
@@ -1470,7 +1472,7 @@ function startPlay(){ if(RUN)return; if(!SC.entities.length){ logMsg('Adicione a
   if(!_aimH)_aimH=(ev)=>{ if(RUN){ const _sp=evPos(ev); RUN._msx=_sp[0]; RUN._msy=_sp[1]; } }; cv.addEventListener('mousemove',_aimH); cv.addEventListener('pointermove',_aimH);
   RUN.last=performance.now(); RUN.raf=requestAnimationFrame(loop);
   logMsg('▶ Jogando — Setas/WASD = mover, Espaço/↑ = pular, J = ação, Esc = parar.'); }
-function stopPlay(){ if(!RUN)return; cancelAnimationFrame(RUN.raf); window.removeEventListener('keydown',keyDown); window.removeEventListener('keyup',keyUp); if(_clickH)cv.removeEventListener('mousedown',_clickH); if(_aimH){cv.removeEventListener('mousemove',_aimH); cv.removeEventListener('pointermove',_aimH);} _carry=null; RUN=null; for(const k in Keys)delete Keys[k]; g('btnPlay').classList.remove('hide'); g('btnStop').classList.add('hide'); Touch.hide(); forceTouch=false; cam.z=editZoom||cam.z; draw(); }
+function stopPlay(){ if(!RUN)return; cancelAnimationFrame(RUN.raf); window.removeEventListener('keydown',keyDown); window.removeEventListener('keyup',keyUp); if(_clickH)cv.removeEventListener('mousedown',_clickH); if(_aimH){cv.removeEventListener('mousemove',_aimH); cv.removeEventListener('pointermove',_aimH);} try{stopMusic();}catch(e){} _carry=null; RUN=null; for(const k in Keys)delete Keys[k]; g('btnPlay').classList.remove('hide'); g('btnStop').classList.add('hide'); Touch.hide(); forceTouch=false; cam.z=editZoom||cam.z; draw(); }
 function gameApi(dt){ if(RUN._gapi){ RUN._gapi.dt=dt; RUN._gapi.t=RUN.t; return RUN._gapi; }
   RUN._gapi={ dt:dt, t:RUN.t,
     get score(){return RUN.score||0;}, set score(v){RUN.score=v;},
@@ -1635,8 +1637,8 @@ function renderBehs(){ const w=g('behs'); if(!w)return; w.innerHTML=''; const a=
 /* ============ SALVAR / CARREGAR ============ */
 function stripEnt(e){ return {id:e.id,name:e.name,x:e.x,y:e.y,asset:e.asset,clip:e.clip,sx:SXof(e),sy:SYof(e),fps:e.fps,flip:e.flip,faceMode:e.faceMode||'auto',layer:e.layer,behaviors:e.behaviors,script:e.script,rules:e.rules||[]}; }
 function sceneData(s){ return {name:s.name,mode:s.mode,tile:s.tile,gravity:s.gravity,bg:s.bg,tileColor:s.tileColor,bgImage:s.bgImage||'',bgW:s.bgW||0,bgH:s.bgH||0,bgLayers:(s.bgLayers||[]).map(L=>({url:L.url,w:L.w,h:L.h,parallax:L.parallax})),grid:s.grid,layers:s.layers,active:s.active,globalScript:s.globalScript||'',globalRules:(s.globalRules||[]),entities:(s.entities||[]).map(stripEnt)}; }
-function serializeProject(){ PR.name=g('projName').value; return {v:2,name:PR.name,cur:PR.cur,target:PR.target||'desktop',touchctl:PR.touchctl||'auto',camZoom:PR.camZoom||1,pvW:PR.pvW||0,pvPos:PR.pvPos||null,sound:PR.sound!==false,touchButtons:PR.touchButtons||defaultButtons(),assets:PR.assets.map(a=>({id:a.id,name:a.name,raw:a.raw})),scenes:PR.scenes.map(sceneData)}; }
-function exportScene(){ const o=sceneData(SC); o.assets=PR.assets.map(a=>({id:a.id,name:a.name,raw:a.raw})); o.name=SC.name; o.target=PR.target||'desktop'; o.touchctl=PR.touchctl||'auto'; o.touchButtons=PR.touchButtons||defaultButtons(); o.sound=PR.sound!==false; return o; }
+function serializeProject(){ PR.name=g('projName').value; return {v:2,name:PR.name,cur:PR.cur,target:PR.target||'desktop',touchctl:PR.touchctl||'auto',camZoom:PR.camZoom||1,pvW:PR.pvW||0,pvPos:PR.pvPos||null,sound:PR.sound!==false,music:PR.music===true,touchButtons:PR.touchButtons||defaultButtons(),assets:PR.assets.map(a=>({id:a.id,name:a.name,raw:a.raw})),scenes:PR.scenes.map(sceneData)}; }
+function exportScene(){ const o=sceneData(SC); o.assets=PR.assets.map(a=>({id:a.id,name:a.name,raw:a.raw})); o.name=SC.name; o.target=PR.target||'desktop'; o.touchctl=PR.touchctl||'auto'; o.touchButtons=PR.touchButtons||defaultButtons(); o.sound=PR.sound!==false; o.music=PR.music===true; return o; }
 function sceneFrom(o){ o=o||{}; const s=newScene(); s.globalScript=o.globalScript||''; s.globalRules=o.globalRules||[]; s.name=o.name||'cena'; s.mode=o.mode||'platformer'; s.tile=o.tile||32; s.gravity=o.gravity!=null?o.gravity:1800; s.bg=o.bg||'#0a0f0c'; s.tileColor=o.tileColor||'#3a5d44'; s.bgImage=o.bgImage||''; s.bgW=o.bgW||0; s.bgH=o.bgH||0; s.bgLayers=(o.bgLayers||[]).map(L=>({url:L.url,w:L.w,h:L.h,parallax:L.parallax})); s.grid=o.grid||{};
   s.layers=(o.layers&&o.layers.length)?o.layers:[{id:'L1',name:'Cenário',visible:true},{id:'L2',name:'Objetos',visible:true}]; s.active=o.active||s.layers[s.layers.length-1].id;
   s.entities=(o.entities||[]).map(e=>Object.assign({behaviors:[],script:'',rules:[]},e)); const lids=s.layers.map(l=>l.id); s.entities.forEach(e=>{ if(lids.indexOf(e.layer)<0)e.layer=s.active; }); return s; }
@@ -1644,7 +1646,7 @@ function loadProject(o){ stopPlay(); let assets,scenes,name='meu-jogo',cur=0;
   if(o&&o.scenes){ name=o.name||'meu-jogo'; cur=o.cur||0; assets=o.assets||[]; scenes=o.scenes.map(sceneFrom); }
   else { name=(o&&o.name)||'meu-jogo'; assets=(o&&o.assets)||[]; scenes=[sceneFrom(o||{})]; }
   if(!scenes.length)scenes=[newScene()];
-  PR={ name:name, cur:0, target:(o&&o.target)||'desktop', touchctl:(o&&o.touchctl)||'auto', camZoom:(o&&o.camZoom)||1, pvW:(o&&o.pvW)||0, pvPos:(o&&o.pvPos)||null, sound:(o?o.sound!==false:true), touchButtons:(o&&o.touchButtons&&o.touchButtons.length)?o.touchButtons:defaultButtons(), assets:assets.map(a=>buildAsset(a.raw,a.name,a.id)), scenes:scenes };
+  PR={ name:name, cur:0, target:(o&&o.target)||'desktop', touchctl:(o&&o.touchctl)||'auto', camZoom:(o&&o.camZoom)||1, pvW:(o&&o.pvW)||0, pvPos:(o&&o.pvPos)||null, sound:(o?o.sound!==false:true), music:!!(o&&o.music), touchButtons:(o&&o.touchButtons&&o.touchButtons.length)?o.touchButtons:defaultButtons(), assets:assets.map(a=>buildAsset(a.raw,a.name,a.id)), scenes:scenes };
   PR.cur=Math.min(Math.max(0,cur),scenes.length-1); SC=PR.scenes[PR.cur];
   sel=null; placeAsset=null; syncSceneInputs(); renderAssets(); renderLayers(); renderScenes(); refreshInspector(); cam={x:-60,y:-60,z:1}; draw(); resetHistory(); }
 function switchScene(i){ stopPlay(); if(i<0||i>=PR.scenes.length)return; PR.cur=i; SC=PR.scenes[i]; sel=null; placeAsset=null; syncSceneInputs(); renderLayers(); renderScenes(); refreshInspector(); cam={x:-60,y:-60,z:1}; draw(); touch(); }
@@ -1657,7 +1659,7 @@ function renderScenes(){ const w=g('sceneList'); if(!w)return; w.innerHTML=''; P
   w.querySelectorAll('.snm').forEach(inp=>inp.oninput=()=>{ PR.scenes[+inp.dataset.i].name=inp.value; touch(); });
   w.querySelectorAll('[data-dup]').forEach(b=>b.onclick=()=>dupScene(+b.dataset.dup));
   w.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ if(PR.scenes.length>1)confirmDialog('Apagar esta cena?').then(ok=>{ if(ok)delScene(+b.dataset.del); }); }); }
-function syncSceneInputs(){ SND_ON=PR.sound!==false; if(g('soundChk'))g('soundChk').checked=PR.sound!==false; g('projName').value=PR.name; if(g('target'))g('target').value=PR.target||'desktop'; if(g('touchctl'))g('touchctl').value=PR.touchctl||'auto'; if(g('camZoom')){ g('camZoom').value=PR.camZoom||1; g('czVal').textContent=(PR.camZoom||1).toFixed(1); } g('modeSel').value=SC.mode; g('tileSize').value=SC.tile; g('gravity').value=SC.gravity; g('bgColor').value=SC.bg; g('tileColor').value=SC.tileColor; g('gravityRow').style.display=SC.mode==='platformer'?'':'none'; }
+function syncSceneInputs(){ SND_ON=PR.sound!==false; if(g('soundChk'))g('soundChk').checked=PR.sound!==false; if(g('musicChk'))g('musicChk').checked=!!PR.music; g('projName').value=PR.name; if(g('target'))g('target').value=PR.target||'desktop'; if(g('touchctl'))g('touchctl').value=PR.touchctl||'auto'; if(g('camZoom')){ g('camZoom').value=PR.camZoom||1; g('czVal').textContent=(PR.camZoom||1).toFixed(1); } g('modeSel').value=SC.mode; g('tileSize').value=SC.tile; g('gravity').value=SC.gravity; g('bgColor').value=SC.bg; g('tileColor').value=SC.tileColor; g('gravityRow').style.display=SC.mode==='platformer'?'':'none'; }
 let _quotaWarned=false;
 function touch(){ g('saveDot').textContent='salvando...'; clearTimeout(saveT); saveT=setTimeout(()=>{ try{ localStorage.setItem('game_proj',JSON.stringify(serializeProject())); g('saveDot').textContent='salvo'; _quotaWarned=false; }catch(e){ g('saveDot').textContent='⚠ não salvo'; if(!_quotaWarned){ _quotaWarned=true; toast('Armazenamento cheio — faça um Backup (.json) em Arquivo ▸ Meus jogos e apague jogos antigos.'); } } pushHistory(); },500); }
 /* ===== Biblioteca local + backup ===== */
@@ -1674,7 +1676,7 @@ function restoreBackup(obj){ if(!obj||!obj.lib){ toast('Arquivo de backup invál
 /* ============ EXPORTAR JOGO (HTML jogável) ============ */
 function buildExportHTML(){
   const scene=exportScene();
-  const fnList=[_hurtPlayer,_burst,drawParts,_ac,_beep,playSnd,spawnRT,_enemyTick,_shootAt,_nearest,SXof,SYof,frameCanvas,computeBBox,buildAsset,assetById,w2s,s2w,bgImageObj,bgLayerImg,drawLayered,drawEntity,draw,solid,collideX,collideY,moveE,overlap,hasClip,autoClip,hasAnimator,respawn,clipDur,clipDurAsset,setLockClip,setNodeClip,flowCond,apiFor,gameApi,_dirVec,_toPlayer,_nearP,_bala,ruleWhen,ruleRun,runObjRules,runGlobalRules,drawHUD2,loop,makeTouchUI];
+  const fnList=[_hurtPlayer,_burst,drawParts,startMusic,stopMusic,_ac,_beep,playSnd,spawnRT,_enemyTick,_shootAt,_nearest,SXof,SYof,frameCanvas,computeBBox,buildAsset,assetById,w2s,s2w,bgImageObj,bgLayerImg,drawLayered,drawEntity,draw,solid,collideX,collideY,moveE,overlap,hasClip,autoClip,hasAnimator,respawn,clipDur,clipDurAsset,setLockClip,setNodeClip,flowCond,apiFor,gameApi,_dirVec,_toPlayer,_nearP,_bala,ruleWhen,ruleRun,runObjRules,runGlobalRules,drawHUD2,loop,makeTouchUI];
   const fnSrc=fnList.map(f=>f.toString()).join('\n');
   const behSrc='const BEH={'+Object.keys(BEH).map(k=>JSON.stringify(k)+':'+BEH[k].toString()).join(',\n')+'};';
   const inputSrc="const Input={ get left(){return !!(Keys['ArrowLeft']||Keys['KeyA']);}, get right(){return !!(Keys['ArrowRight']||Keys['KeyD']);}, get up(){return !!(Keys['ArrowUp']||Keys['KeyW']);}, get down(){return !!(Keys['ArrowDown']||Keys['KeyS']);}, get jump(){return !!(Keys['Space']||Keys['ArrowUp']||Keys['KeyW']);}, get action(){return !!(Keys['KeyJ']||Keys['KeyZ']);}, key(c){return !!Keys[c];} };";
@@ -1692,7 +1694,7 @@ const ents=SC.entities.map(e=>{ const a=assetById(e.asset); const bb=a?a.bbox:{x
     x:e.x+bb.x*SXof(e),y:e.y+bb.y*SYof(e),w:Math.max(2,bb.w*SXof(e)),h:Math.max(2,bb.h*SYof(e)),
     vx:0,vy:0,onGround:false,_t:0,behaviors:(e.behaviors||[]).map(b=>({type:b.type,params:JSON.parse(JSON.stringify(b.params||{}))})),script:e.script||'',rules:(e.rules||[]),state:{},dead:false};
   rt.startX=rt.x; rt.startY=rt.y; if(rt.script.trim()){ try{ rt._fn=new Function('dt',rt.script);}catch(err){ rt._fn=null; } } return rt; });
-RUN={ents:ents,player:null,t:0,dt:0,score:0,over:null,_gstate:{},_hud:null,last:performance.now()}; RUN._grules=SCENE.globalRules||[]; function restartScene(){location.reload();} function nextSceneAction(){location.reload();} cv.addEventListener('mousedown',function(){if(RUN)RUN._click=true;}); cv.addEventListener('mousemove',function(ev){if(RUN){var _r=cv.getBoundingClientRect();RUN._msx=ev.clientX-_r.left;RUN._msy=ev.clientY-_r.top;}}); if(SCENE.globalScript){ try{ RUN._gfn=new Function('dt',SCENE.globalScript); }catch(e){} }
+RUN={ents:ents,player:null,t:0,dt:0,score:0,over:null,_gstate:{},_hud:null,last:performance.now()}; RUN._grules=SCENE.globalRules||[]; function restartScene(){location.reload();} function nextSceneAction(){location.reload();} cv.addEventListener('mousedown',function(){if(RUN)RUN._click=true;}); cv.addEventListener('mousemove',function(ev){if(RUN){var _r=cv.getBoundingClientRect();RUN._msx=ev.clientX-_r.left;RUN._msy=ev.clientY-_r.top;}}); if(SCENE.music){ try{ startMusic(); }catch(e){} } if(SCENE.globalScript){ try{ RUN._gfn=new Function('dt',SCENE.globalScript); }catch(e){} }
 RUN.player=ents.find(e=>e.behaviors.some(b=>b.type==='player-platformer'||b.type==='player-topdown'))||null;
 if(SCENE.touchctl==='on'||(SCENE.touchctl!=='off'&&('ontouchstart' in window||navigator.maxTouchPoints>0||(SCENE.target&&SCENE.target!=='desktop')))) makeTouchUI(document.body, SCENE.touchButtons||[], true);
 RUN.raf=requestAnimationFrame(loop);
@@ -2250,6 +2252,8 @@ function playSnd(kind){ if(!SND_ON)return; switch(kind){
   case 'porta': _beep(300,0.14,'square',0.14,520); break;
   default: _beep(560,0.08,'square',0.12); } }
 
+function startMusic(){ stopMusic(); if(!SND_ON)return; const c=_ac(); if(!c)return; const scale=[262,294,330,392,440,392,330,294]; let i=0; window._amzMusicT=setInterval(function(){ try{ _beep(scale[i%scale.length],0.42,'sine',0.045); if(i%4===0)_beep(131,0.5,'triangle',0.04); i++; }catch(e){} },480); }
+function stopMusic(){ if(window._amzMusicT){ clearInterval(window._amzMusicT); window._amzMusicT=null; } }
 function _burst(x,y,c,n){ if(typeof RUN==='undefined'||!RUN)return; if(!RUN._parts)RUN._parts=[]; if(RUN._parts.length>240)return; n=n||8; for(let i=0;i<n;i++){ const a=Math.random()*6.283,sp=40+Math.random()*150; RUN._parts.push({x:x,y:y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-50,life:0.35+Math.random()*0.35,max:0.7,c:c||'#ffd23f'}); } }
 function drawParts(){ if(typeof RUN==='undefined'||!RUN||!RUN._parts||!RUN._parts.length)return; cx.save(); for(const q of RUN._parts){ const pp=w2s(q.x,q.y); cx.globalAlpha=Math.max(0,Math.min(1,q.life/q.max)); cx.fillStyle=q.c; const sz=Math.max(2,3*cam.z); cx.fillRect(pp[0]-sz/2,pp[1]-sz/2,sz,sz); } cx.globalAlpha=1; cx.restore(); }
 /* ============ DESFAZER / REFAZER ============ */
@@ -2279,7 +2283,7 @@ function wire(){ buildTools(); setTool('select');
   g('gravity').oninput=e=>{ SC.gravity=+e.target.value||0; touch(); };
   g('bgColor').oninput=e=>{ SC.bg=e.target.value; draw(); touch(); }; g('tileColor').oninput=e=>{ SC.tileColor=e.target.value; draw(); touch(); };
   g('gridChk').onchange=e=>{ showGrid=e.target.checked; draw(); }; g('snapChk').onchange=e=>{ snap=e.target.checked; };
-  g('zoomIn').onclick=()=>{ cam.z=Math.min(6,cam.z*1.2); draw(); }; g('zoomOut').onclick=()=>{ cam.z=Math.max(.2,cam.z/1.2); draw(); }; g('zoomReset').onclick=()=>{ cam={x:-60,y:-60,z:1}; draw(); }; g('undoBtn').onclick=()=>undo(); g('redoBtn').onclick=()=>redo(); g('soundChk').onchange=e=>{ PR.sound=e.target.checked; SND_ON=PR.sound; touch(); };
+  g('zoomIn').onclick=()=>{ cam.z=Math.min(6,cam.z*1.2); draw(); }; g('zoomOut').onclick=()=>{ cam.z=Math.max(.2,cam.z/1.2); draw(); }; g('zoomReset').onclick=()=>{ cam={x:-60,y:-60,z:1}; draw(); }; g('undoBtn').onclick=()=>undo(); g('redoBtn').onclick=()=>redo(); g('soundChk').onchange=e=>{ PR.sound=e.target.checked; SND_ON=PR.sound; touch(); }; if(g('musicChk'))g('musicChk').onchange=e=>{ PR.music=e.target.checked; touch(); if(RUN){ e.target.checked?startMusic():stopMusic(); } };
   g('pview').onclick=()=>togglePV();
   g('camZoom').oninput=e=>{ PR.camZoom=+e.target.value; g('czVal').textContent=(+e.target.value).toFixed(1); draw(); touch(); };
   (function(){ const head=g('pvHead'), panel=g('pvPanel'), rz=g('pvResize'); let dr=null;
