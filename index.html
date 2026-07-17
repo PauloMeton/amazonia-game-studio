@@ -7,6 +7,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root{--bg:#0f1a12;--panel:#16241a;--panel2:#1d3025;--line:#2c4a36;--txt:#dff3e6;--muted:#8fb89c;--accent:#7FFFD4;--accent2:#D4AF37;--danger:#ff6b6b}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -376,6 +377,7 @@ if(this.enemies().length===0) this.win();"></textarea>
       <button id="btnExportJson">💾 Exportar .json</button>
       <button id="btnExportGame">⬇ Exportar jogo (HTML)</button>
       <button id="btnExportApp">📦 Exportar app</button>
+      <button id="btnPublish">🔗 Publicar (link/QR)</button>
       <button id="cloudBtn" class="hide">☁ Salvar na nuvem</button>
       <button id="profileBtn" class="hide">👤 Perfil</button>
       <button id="logoutBtn" class="hide">🚪 Sair</button>
@@ -1753,7 +1755,8 @@ function importArt(p,name){ if(!p){ logMsg('Arquivo não parece uma pixel art.')
 
 /* ============ FIREBASE ============ */
 let db=null,user=null,fbOk=false;
-function initFB(){ try{ firebase.initializeApp(FB); db=firebase.firestore(); fbOk=true; firebase.auth().onAuthStateChanged(u=>{ user=u; afterAuth(); }); }catch(e){ console.warn(e); g('auth-msg').textContent='Firebase indisponível — use "sem login".'; } }
+function _fbInit(){ if(window._fbReady)return true; try{ firebase.initializeApp(FB); db=firebase.firestore(); window._fbReady=true; return true; }catch(e){ console.warn(e); return false; } }
+function initFB(){ if(_fbInit()){ fbOk=true; try{ firebase.auth().onAuthStateChanged(u=>{ user=u; afterAuth(); }); }catch(e){} } else { try{g('auth-msg').textContent='Firebase indisponível — use "sem login".';}catch(e){} } }
 function afterAuth(){ if(user){ g('authgate').style.display='none'; g('userBox').textContent=user.email||'logado'; ['userBox','cloudBtn','profileBtn','logoutBtn'].forEach(i=>g(i).classList.remove('hide')); try{localStorage.setItem('gs_authmode','cloud');}catch(e){} } }
 function openLogin(){ g('authgate').style.display='flex'; if(g('auth-msg'))g('auth-msg').textContent=''; }
 function login(){ if(!fbOk)return; firebase.auth().signInWithEmailAndPassword(g('au-email').value,g('au-pass').value).catch(e=>g('auth-msg').textContent=e.message); }
@@ -1763,6 +1766,33 @@ function skip(){ g('authgate').style.display='none'; try{localStorage.setItem('g
 function cloudSave(){ if(!user){ logMsg('Entre na conta para salvar na nuvem.'); return; } const data=serializeProject(); db.collection('gameprojects').add({uid:user.uid,name:data.name,data:data,ts:Date.now()}).then(()=>{ g('prof-msg').textContent='Projeto salvo na nuvem!'; logMsg('☁ Projeto salvo na nuvem.'); }).catch(e=>{ g('prof-msg').textContent=e.message; logMsg('Erro ao salvar: '+e.message); }); }
 function listScenes(){ const w=g('prof-scenes'); if(!user){w.innerHTML='<p class="note">Entre para ver.</p>';return;} w.innerHTML='<p class="note">carregando...</p>'; db.collection('gameprojects').where('uid','==',user.uid).get().then(s=>{ if(s.empty){w.innerHTML='<p class="note">Nenhum jogo salvo.</p>';return;} w.innerHTML=''; const arr=[]; s.forEach(d=>arr.push({id:d.id,...d.data()})); arr.sort((a,b)=>(b.ts||0)-(a.ts||0)); arr.forEach(it=>{ const d=document.createElement('div'); d.className='asset'; d.innerHTML='<div class="nm">'+esc(it.name||'jogo')+'</div>'; const b=document.createElement('button'); b.textContent='abrir'; b.onclick=()=>{ loadProject(it.data); g('profile').classList.remove('open'); logMsg('Projeto "'+(it.name||'')+'" carregado.'); }; d.appendChild(b); w.appendChild(d); }); }).catch(e=>w.innerHTML='<p class="note">'+esc(e.message)+'</p>'); }
 function listArts(){ const w=g('artsList'); if(!user){w.innerHTML='<p class="note">Entre na conta para ver suas artes.</p>';return;} w.innerHTML='<p class="note">carregando...</p>'; db.collection('pixelart').where('uid','==',user.uid).get().then(s=>{ if(s.empty){w.innerHTML='<p class="note">Nenhuma arte na nuvem. Salve no Pixel Studio.</p>';return;} w.innerHTML=''; s.forEach(doc=>{ const it=doc.data(); const p=projFromAny(it); const d=document.createElement('div'); d.className='asset'; d.innerHTML='<div class="nm">'+esc((it.name)||'art')+'</div>'; const b=document.createElement('button'); b.textContent='+ usar'; b.onclick=()=>{ importArt(p,it.name); }; d.appendChild(b); w.appendChild(d); }); }).catch(e=>w.innerHTML='<p class="note">'+esc(e.message)+'</p>'); }
+
+const PLAY_BASE='https://paulometon.github.io/amazonia-game-studio/index.html';
+async function _gzB64(str){ if(typeof CompressionStream==='undefined')return null; const cs=new CompressionStream('gzip'); const w=cs.writable.getWriter(); w.write(new TextEncoder().encode(str)); w.close(); const buf=await new Response(cs.readable).arrayBuffer(); const bytes=new Uint8Array(buf); let bin='',CH=0x8000; for(let i=0;i<bytes.length;i+=CH){ bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+CH)); } return btoa(bin); }
+async function _ungzB64(b64){ const bin=atob(b64); const bytes=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i); if(typeof DecompressionStream==='undefined')throw new Error('navegador sem suporte a descompressão'); const ds=new DecompressionStream('gzip'); const w=ds.writable.getWriter(); w.write(bytes); w.close(); const buf=await new Response(ds.readable).arrayBuffer(); return new TextDecoder().decode(buf); }
+async function _maybePlayMode(){ const m=(location.hash||'').match(/[#&]play=([A-Za-z0-9_-]+)/); if(!m)return false; document.body.innerHTML='<div style="font-family:system-ui;color:#ddd;background:#111;position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px">Carregando jogo…</div>'; try{ if(!db)throw new Error('sem conexão'); const snap=await db.collection('publishedgames').doc(m[1]).get(); if(!snap.exists)throw new Error('jogo não encontrado'); const d=snap.data(); let html=d.gz?await _ungzB64(d.data):d.data; const ifr=document.createElement('iframe'); ifr.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0'; ifr.setAttribute('allow','autoplay; fullscreen'); document.body.innerHTML=''; document.body.appendChild(ifr); ifr.srcdoc=html; }catch(e){ document.body.innerHTML='<div style="font-family:system-ui;color:#ddd;background:#111;position:fixed;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px">Não foi possível abrir o jogo.<br>'+(e&&e.message||e)+'</div>'; } return true; }
+async function publishGame(){
+  if(!fbOk){ toast('Firebase indisponível agora.'); return; }
+  if(!user){ toast('Entre na conta (☁ Entrar) para publicar seu jogo.'); try{openLogin();}catch(e){} return; }
+  if(!db){ toast('Banco indisponível agora.'); return; }
+  try{
+    toast('Gerando o jogo…');
+    const html=buildExportHTML();
+    const err=await exportSmokeTest(html);
+    if(err){ const ok=await confirmDialog('O teste do jogo apontou um erro:\n\n'+err+'\n\nPublicar mesmo assim?'); if(!ok){ toast('Publicação cancelada.'); return; } }
+    let gz=false,data=html;
+    try{ const b=await _gzB64(html); if(b){ gz=true; data=b; } }catch(e){}
+    if(data.length>1000000){ toast('Jogo grande demais p/ publicar ('+Math.round(data.length/1024)+' KB). Reduza artes/áudio.'); return; }
+    toast('Enviando para a nuvem…');
+    const doc=await db.collection('publishedgames').add({uid:user.uid,name:(PR.name||'jogo'),gz:gz,data:data,ts:Date.now()});
+    const base=(location.protocol.indexOf('http')===0)?(location.origin+location.pathname):PLAY_BASE;
+    const url=base+'#play='+doc.id;
+    showPublish(url);
+    logMsg('☁ Jogo publicado: '+url);
+    toast('Jogo publicado!');
+  }catch(e){ toast('Erro ao publicar: '+(e&&e.message||e)); logMsg('Erro ao publicar: '+(e&&e.message||e)); }
+}
+function showPublish(url){ try{ g('pubLink').value=url; const a=g('pubOpen'); if(a)a.href=url; const qb=g('pubQR'); qb.innerHTML=''; if(typeof QRCode!=='undefined'){ new QRCode(qb,{text:url,width:180,height:180,correctLevel:QRCode.CorrectLevel.M}); } else { qb.textContent='(QR indisponível — copie o link)'; } g('publishModal').classList.add('open'); }catch(e){ toast('Erro ao mostrar link: '+e.message); } }
 
 /* ============ EDITOR DE FLUXO DE ANIMAÇÕES ============ */
 const COND_LABELS={always:'sempre',moving:'andando',idle:'parado',onground:'no chão',air:'no ar',up:'subindo',down:'caindo',keydown:'tecla apertada',animend:'ao terminar a animação'};
@@ -2370,6 +2400,9 @@ function wire(){ buildTools(); setTool('select');
   document.querySelectorAll('.side .card>h3').forEach(h=>{ h.title='clique para recolher/expandir'; h.onclick=()=>h.parentElement.classList.toggle('collapsed'); });
   g('btnExportGame').onclick=async ()=>{ try{ const html=buildExportHTML(); toast('Testando o jogo exportado…'); const err=await exportSmokeTest(html); if(err){ const ok=await confirmDialog('O teste do jogo exportado apontou um erro:\n\n'+err+'\n\nQuer baixar mesmo assim?'); if(!ok){ logMsg('Exportação cancelada (erro no teste): '+err); toast('Exportação cancelada.'); return; } } const b=new Blob([html],{type:'text/html'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=(SC.name||'jogo')+'-jogo.html'; a.click(); logMsg('Jogo exportado como HTML jogável (abra o arquivo baixado).'); toast('Jogo exportado'+(err?' (com aviso)':'!')); }catch(err){ logMsg('Erro ao exportar: '+err.message); toast('Erro ao exportar: '+err.message); } };
   g('btnExportApp').onclick=()=>{ try{ buildAppZip(); }catch(err){ logMsg('Erro ao exportar app: '+err.message); } };
+  g('btnPublish').onclick=publishGame;
+  g('pubCopy').onclick=()=>{ const i=g('pubLink'); i.select(); try{i.setSelectionRange(0,99999);}catch(e){} try{ navigator.clipboard.writeText(i.value); }catch(e){ try{document.execCommand('copy');}catch(_){} } toast('Link copiado!'); };
+  g('pubClose').onclick=()=>g('publishModal').classList.remove('open');
   g('addScene').onclick=()=>addScene();
   g('target').onchange=e=>{ PR.target=e.target.value; draw(); touch(); };
   g('touchctl').onchange=e=>{ PR.touchctl=e.target.value; touch(); };
@@ -2441,7 +2474,7 @@ function wire(){ buildTools(); setTool('select');
   window.addEventListener('message',e=>{ const d=e.data; if(d&&d.type==='amz_project'){ const p=projFromAny(d.data); if(p){ importArt(p,(d.data&&d.data.name)||'arte'); closeArtEditor(); } else logMsg('Arte recebida vazia.'); } if(d&&d.type==='amz_3dimage'){ convert3D(d.data); close3D(); } });
   document.addEventListener('keydown',e=>{ if(RUN)return; if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return; if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){ e.preventDefault(); if(e.shiftKey)redo(); else undo(); return; } if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){ e.preventDefault(); redo(); return; } if(e.key==='Delete'&&sel){ SC.entities=SC.entities.filter(z=>z!==sel); select(null); touch(); } });
 }
-function boot(){ wire(); initFB(); g('authgate').style.display='none';
+async function boot(){ _fbInit(); if(await _maybePlayMode())return; wire(); initFB(); g('authgate').style.display='none';
   let loaded=false; try{ const r=localStorage.getItem('game_proj'); if(r){ loadProject(JSON.parse(r)); loaded=true; } }catch(e){}
   if(!loaded){ syncSceneInputs(); renderAssets(); renderLayers(); renderScenes(); resetHistory(); }
   resize(); logMsg('Bem-vindo ao Game Studio! 1) Importe suas artes  2) Pinte plataformas  3) Coloque objetos  4) Dê um comportamento de Player  5) ▶ Jogar.');
@@ -2468,6 +2501,15 @@ if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded'
     <p class="note">O Backup salva TODOS os seus jogos locais num arquivo .json. Guarde-o para nunca perder seu trabalho.</p>
   </div>
 </div>
+ <div id="publishModal" class="modal">
+   <div class="auth-card" style="width:460px;max-width:94%;gap:10px">
+     <div class="row" style="justify-content:space-between"><div class="auth-logo" style="margin:0;font-size:1.05em">🔗 Jogo publicado</div><button id="pubClose">fechar</button></div>
+     <p class="note">Qualquer pessoa com este link pode jogar (inclusive no celular). Aponte a câmera no QR para abrir.</p>
+     <div id="pubQR" style="display:flex;justify-content:center;padding:8px;background:#fff;border-radius:10px;align-self:center"></div>
+     <div class="row"><input id="pubLink" readonly style="flex:1" onclick="this.select()"><button class="primary" id="pubCopy">copiar</button></div>
+     <a id="pubOpen" href="#" target="_blank" rel="noopener" class="note">▶ Abrir o jogo em nova aba</a>
+   </div>
+ </div>
 <div id="welcomeModal" class="modal">
   <div class="auth-card" style="width:460px;max-width:94%">
     <div class="auth-logo" style="font-size:1.2em">👋 Bem-vindo ao Game Studio</div>
