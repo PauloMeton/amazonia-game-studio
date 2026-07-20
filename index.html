@@ -1981,6 +1981,109 @@ const TEMPLATES=[
  {key:'soulknight',emoji:'🎯',title:'Roguelite de tiro',ref:'tipo Soul Knight',mode:'Top-down',mechs:['Mira no cursor (twin-stick)','Sala fechada com inimigos','Inimigo cacador que atira','Moedas']},
  {key:'3d',emoji:'🧊',title:'3D em 1a pessoa',ref:'modulo a parte (beta)',mode:'3D',mechs:['Abre o construtor de Jogo 3D']}
 ];
+/* ===================== 10 EXEMPLOS NATIVOS (com arte/tema) ===================== */
+function exMk(w,h){ return {w:w,h:h,a:new Array(w*h).fill('')}; }
+function exPx(o,x,y,c){ if(x>=0&&y>=0&&x<o.w&&y<o.h)o.a[y*o.w+x]=c; }
+function exRc(o,x0,y0,x1,y1,c){ for(var y=y0;y<=y1;y++)for(var x=x0;x<=x1;x++)exPx(o,x,y,c); }
+function exHero(p,variant){ function fr(step){ var o=exMk(12,16);
+  exRc(o,3,3,8,6,p.skin); exPx(o,4,4,'#141414'); exPx(o,7,4,'#141414');
+  if(variant==='cap'){ exRc(o,3,0,8,1,p.cap); exRc(o,4,1,9,2,p.cap); }
+  else if(variant==='helmet'){ exRc(o,2,0,9,3,p.cap); exPx(o,3,4,p.cap); exPx(o,8,4,p.cap); }
+  else if(variant==='hood'){ exRc(o,2,0,9,4,p.cap); exRc(o,4,4,7,6,p.skin); }
+  else { exRc(o,3,1,8,2,p.cap); exPx(o,4,0,p.cap); exPx(o,7,0,p.cap); }
+  exRc(o,3,7,8,11,p.body); exPx(o,2,8,p.skin); exPx(o,9,8,p.skin);
+  if(step===0){ exRc(o,3,12,4,15,p.leg); exRc(o,7,12,8,15,p.leg); } else { exRc(o,4,12,5,15,p.leg); exRc(o,6,12,7,15,p.leg); }
+  return o.a; }
+  return {w:12,h:16,clips:{idle:[fr(0),fr(1)],andar:[fr(0),fr(1)],atira:[fr(0)]}}; }
+function exBlob(col){ function fr(s){ var o=exMk(12,12); exRc(o,2,4,9,10,col);exRc(o,3,3,8,3,col);exRc(o,4,2,7,2,col); exPx(o,4,6,'#fff');exPx(o,7,6,'#fff');exPx(o,4,7,'#111');exPx(o,7,7,'#111'); if(s){exRc(o,2,11,4,11,col);exRc(o,7,11,9,11,col);} return o.a;} return {w:12,h:12,clips:{idle:[fr(0),fr(1)],andar:[fr(0),fr(1)],atira:[fr(0)]}}; }
+function exGhost(col){ function fr(s){ var o=exMk(12,12); exRc(o,2,2,9,9,col);exRc(o,3,1,8,1,col); exPx(o,4,4,'#111');exPx(o,7,4,'#111'); [2,5,8].forEach(function(b){ exRc(o,b,10,b+1,10+(s?1:0),col);}); return o.a;} return {w:12,h:12,clips:{idle:[fr(0),fr(1)],andar:[fr(0),fr(1)],atira:[fr(0)]}}; }
+function exSkull(col){ function fr(){ var o=exMk(12,12); exRc(o,2,2,9,8,col);exRc(o,3,9,8,10,col); exPx(o,4,5,'#111');exPx(o,7,5,'#111');exRc(o,5,7,6,8,'#111'); return o.a;} return {w:12,h:12,clips:{idle:[fr()],andar:[fr()],atira:[fr()]}}; }
+function exBug(col,leg){ function fr(s){ var o=exMk(12,14); exRc(o,2,3,9,12,col);exRc(o,3,2,8,2,col);exRc(o,1,5,1,10,col);exRc(o,10,5,10,10,col);exPx(o,4,6,'#fff');exPx(o,7,6,'#fff');exPx(o,4,7,'#141414');exPx(o,7,7,'#141414'); if(s){exRc(o,3,13,4,13,leg);exRc(o,7,13,8,13,leg);}else{exRc(o,4,13,5,13,leg);exRc(o,6,13,7,13,leg);} return o.a;} return {w:12,h:14,clips:{idle:[fr(0),fr(1)],andar:[fr(0),fr(1)],atira:[fr(0)]}}; }
+function exSpike(col,base){ var o=exMk(12,10); for(var s=0;s<3;s++){var cx=2+s*4; for(var y=0;y<7;y++){var half=Math.floor((7-y)/2); for(var x=cx-half;x<=cx+half;x++)exPx(o,x,y+2,col);}} exRc(o,0,9,11,9,base); return {w:12,h:10,clips:{idle:[o.a],andar:[o.a],atira:[o.a]}}; }
+function exCircle(ci,co){ var w=8,h=8,a=new Array(w*h).fill(''); for(var y=0;y<h;y++)for(var x=0;x<w;x++){var dx=x-3.5,dy=y-3.5,d=dx*dx+dy*dy; if(d<=10)a[y*w+x]=(d<=4?ci:co);} return {w:w,h:h,clips:{idle:[a]}}; }
+function exGem(c){ return _art(["  c  "," ccc ","ccccc"," ccc ","  c  "],{c:c}); }
+function exStar(c){ return _art(["  y  "," yyy ","yyyyy"," yyy ","y   y"],{y:c}); }
+function exOutline(a,w,h,oc){ var b=a.slice(); for(var y=0;y<h;y++)for(var x=0;x<w;x++){ if(a[y*w+x])continue; var near=false; for(var dy=-1;dy<=1&&!near;dy++){ for(var dx=-1;dx<=1;dx++){ if(!dx&&!dy)continue; var nx=x+dx,ny=y+dy; if(nx>=0&&ny>=0&&nx<w&&ny<h&&a[ny*w+nx]){near=true;break;} } } if(near)b[y*w+x]=oc; } return b; }
+function exOL(sp){ var o={w:sp.w,h:sp.h,clips:{}}; for(var k in sp.clips){ o.clips[k]=sp.clips[k].map(function(fm){ return exOutline(fm,sp.w,sp.h,'#141414'); }); } return o; }
+function exE(id,nm,x,y,asset,beh,rules,sx,sy){ return {id:id,name:nm,x:x,y:y,asset:asset,clip:'idle',sx:sx||2,sy:sy||2,fps:8,flip:false,faceMode:'auto',layer:'L2',behaviors:beh||[],script:'',rules:rules||[]}; }
+function exAn(){ return {type:'animator',params:{parado:'idle',andando:'andar'}}; }
+function exScene(name,mode,grav,grid,ents,gr){ return {name:name,mode:mode,tile:32,gravity:grav,bg:'#0a0f0c',tileColor:'#3a5d44',bgImage:'',bgW:0,bgH:0,bgLayers:[],grid:grid,layers:[{id:'L1',name:'Cenario',visible:true},{id:'L2',name:'Objetos',visible:true}],active:'L2',globalScript:'',globalRules:gr||[{w:{id:'sempre'},a:{id:'mostrarPlacar'}}],entities:ents}; }
+function exProj(name,scene){ var p=_tplBase(name); p.name=name; p.scenes=[scene]; return p; }
+function exTplWin(kind,extra){ var p=tplProject(kind); if(extra)p.scenes[0].globalRules=p.scenes[0].globalRules.concat(extra); return p; }
+var EXT=32;
+function exRunner(){ var grid={}; for(var x=0;x<160;x++){ if((x>=34&&x<36)||(x>=70&&x<72)) continue; grid[x+',12']=1; }
+  var ents=[exE('p','heroi',60,330,'hero',[{type:'player-platformer',params:{speed:200,jump:600}},exAn()],[{w:{id:'sempre'},a:{id:'moverDir',vel:230}},{w:{id:'caiuTela'},a:{id:'perder'}}])];
+  [20,48,58,85,100,120].forEach(function(cx,i){ ents.push(exE('hz'+i,'espinho',cx*EXT,11*EXT+10,'enemy',[{type:'hazard',params:{}}])); });
+  return exProj('modelo-corredor', exScene('fase 1','platformer',1800,grid,ents,[{w:{id:'sempre'},a:{id:'mostrarPlacar'}},{w:{id:'intervalo',seg:1},a:{id:'placarMais',n:1}},{w:{id:'tempoJogo',seg:25},a:{id:'vencer'}}])); }
+function exColeta(){ var grid={}; for(var c=2;c<=23;c++){grid[c+',2']=1;grid[c+',15']=1;} for(var r=2;r<=15;r++){grid['2,'+r]=1;grid['23,'+r]=1;}
+  var ents=[exE('p','heroi',12*EXT,8*EXT,'hero',[{type:'player-topdown',params:{speed:175}},exAn()])];
+  [[5,5],[9,4],[18,5],[20,8],[6,12],[16,12],[13,7],[10,10]].forEach(function(sp,i){ ents.push(exE('c'+i,'moeda',sp[0]*EXT,sp[1]*EXT,'coin',[{type:'collectible',params:{value:1}}])); });
+  return exProj('modelo-coleta-tempo', exScene('fase 1','topdown',0,grid,ents,[{w:{id:'inicio'},a:{id:'iniciarCronometro',seg:20}},{w:{id:'sempre'},a:{id:'mostrarCronometro'}},{w:{id:'placarMaior',valor:8},a:{id:'vencer'}},{w:{id:'cronometroFim'},a:{id:'perder'}}])); }
+function exMaze(){ var grid={}; for(var c=1;c<=22;c++){grid[c+',1']=1;grid[c+',16']=1;} for(var r=1;r<=16;r++){grid['1,'+r]=1;grid['22,'+r]=1;}
+  for(var r=2;r<=12;r++)grid['5,'+r]=1; for(var r=5;r<=15;r++)grid['9,'+r]=1; for(var r=2;r<=12;r++)grid['13,'+r]=1; for(var r=5;r<=15;r++)grid['17,'+r]=1;
+  var ents=[exE('p','heroi',3*EXT,14*EXT,'hero',[{type:'player-topdown',params:{speed:165}},exAn()])];
+  ents.push(exE('sd','saida',20*EXT,3*EXT,'coin',[],[{w:{id:'encostaPlayer'},a:{id:'vencer'}}]));
+  ents.push(exE('e1','inimigo',7*EXT,4*EXT,'enemy',[{type:'inimigo-persegue',params:{vida:3,velocidade:70}},exAn()]));
+  ents.push(exE('e2','inimigo',11*EXT,13*EXT,'enemy',[{type:'inimigo-persegue',params:{vida:3,velocidade:70}},exAn()]));
+  ents.push(exE('e3','inimigo',15*EXT,4*EXT,'enemy',[{type:'inimigo-persegue',params:{vida:3,velocidade:70}},exAn()]));
+  return exProj('modelo-labirinto', exScene('fase 1','topdown',0,grid,ents,[{w:{id:'sempre'},a:{id:'mostrarPlacar'}}])); }
+function exArena(){ var grid={}; for(var c=1;c<=24;c++)grid[c+',15']=1; for(var r=2;r<=15;r++){grid['1,'+r]=1;grid['24,'+r]=1;}
+  var ents=[exE('p','heroi',12*EXT,13*EXT,'hero',[{type:'player-platformer',params:{speed:210,jump:560}},exAn(),{type:'arma-tiro',params:{velocidade:420,cadencia:0.25}}])];
+  [[4,14],[8,14],[16,14],[20,14]].forEach(function(sp,i){ ents.push(exE('e'+i,'inimigo',sp[0]*EXT,sp[1]*EXT,'enemy',[{type:'inimigo-persegue',params:{vida:2,velocidade:70}},exAn()])); });
+  return exProj('modelo-arena', exScene('fase 1','platformer',1800,grid,ents,[{w:{id:'sempre'},a:{id:'mostrarPlacar'}},{w:{id:'intervalo',seg:5},a:{id:'invocarInimigo',asset:'enemy'}},{w:{id:'tempoJogo',seg:30},a:{id:'vencer'}}])); }
+function exPuzzle(){ var grid={}; for(var x=0;x<28;x++)grid[x+',12']=1;
+  var ents=[exE('p','heroi',40,330,'hero',[{type:'player-platformer',params:{speed:190,jump:560}},exAn()])];
+  ents.push(exE('bl','bloco',6*EXT,11*EXT,'coin',[{type:'empurravel',params:{velocidade:80}}]));
+  ents.push(exE('bt','botao',9*EXT,11*EXT,'coin',[{type:'botao',params:{}}]));
+  ents.push(exE('po','porta',14*EXT,10*EXT,'hero',[{type:'porta',params:{}}],[],1,2));
+  ents.push(exE('kv','chave',18*EXT,10*EXT,'coin',[{type:'chave',params:{}}]));
+  ents.push(exE('sd','saida',26*EXT,10.3*EXT,'hero',[{type:'saida-chaves',params:{chaves:1}}]));
+  return exProj('modelo-puzzle', exScene('fase 1','platformer',1800,grid,ents,[{w:{id:'sempre'},a:{id:'mostrarPlacar'}}])); }
+var EX_ART=[
+ {hero:exOL(exHero({cap:'#e0392b',skin:'#f0b878',body:'#d0392b',leg:'#2c46c0'},'cap')), enemy:exOL(exBug('#9a6a44','#5a3a20')), coin:exOL(exCircle('#fff0a0','#f1c40f'))},
+ {hero:exOL(exHero({cap:'#37a04a',skin:'#f0b878',body:'#2ecc71',leg:'#6d4c41'},'hood')), enemy:exOL(exBlob('#e74c3c')), coin:exOL(exGem('#5fe0f0'))},
+ {hero:exOL(exHero({cap:'#3498db',skin:'#f0b878',body:'#3d566e',leg:'#2c3e50'},'helmet')), enemy:exOL(exBlob('#2ecc71')), coin:exOL(exGem('#55e0ff'))},
+ {hero:exOL(exHero({cap:'#f4f7f8',skin:'#e6edf0',body:'#c2ccd0',leg:'#7a848a'},'hood')), enemy:exOL(exBug('#34424a','#0a0a0a')), coin:exOL(exCircle('#f4faff','#b8c2c9'))},
+ {hero:exOL(exHero({cap:'#3498db',skin:'#c8e6fb',body:'#2e86c1',leg:'#1b4f72'},'helmet')), enemy:exOL(exBug('#f5a623','#b9770e')), coin:exOL(exStar('#ffd23f'))},
+ {hero:exOL(exHero({cap:'#f39c12',skin:'#f0b878',body:'#e67e22',leg:'#8a95a0'},'cap')), enemy:exOL(exSpike('#aeb6bd','#5a6570')), coin:exOL(exCircle('#fff0a0','#f1c40f'))},
+ {hero:exOL(exHero({cap:'#1abc9c',skin:'#f0b878',body:'#16d0ae',leg:'#0e6655'},'cap')), enemy:exOL(exBlob('#e74c3c')), coin:exOL(exStar('#ffe14d'))},
+ {hero:exOL(exHero({cap:'#a259d6',skin:'#f0b878',body:'#9b59b6',leg:'#6c3483'},'cap')), enemy:exOL(exGhost('#f4f7f8')), coin:exOL(exStar('#3ee87a'))},
+ {hero:exOL(exHero({cap:'#c0392b',skin:'#f0b878',body:'#a83226',leg:'#5b2c6f'},'helmet')), enemy:exOL(exSkull('#f4f7f8')), coin:exOL(exCircle('#fff0a0','#f1c40f'))},
+ {hero:exOL(exHero({cap:'#00c9dc',skin:'#f0b878',body:'#00a3b4',leg:'#006064'},'cap')), enemy:exOL(exBlob('#e67e22')), coin:exOL(exGem('#55e0ff'))}
+];
+var EX_THEMES=[
+ {bg:'#6b8cff',tile:'#b5651d',msg:'Pegue as moedas e siga em frente!'},
+ {bg:'#0e2f16',tile:'#3a7d44',msg:'Pegue a chave e ache a saida!'},
+ {bg:'#1b2233',tile:'#3a4a66',msg:'Elimine todos os inimigos!'},
+ {bg:'#0b1220',tile:'#2a3550',msg:'Use dash e pulo duplo. Vença o chefe!'},
+ {bg:'#12294a',tile:'#2e6ea8',msg:'Atire com J e derrote todos!'},
+ {bg:'#241a34',tile:'#5a4a6e',msg:'Pule os espinhos! Sobreviva 25s.'},
+ {bg:'#0e3330',tile:'#178f7a',msg:'Pegue as 8 estrelas antes do tempo!'},
+ {bg:'#160a20',tile:'#5b3a7a',msg:'Ache a saida e fuja dos fantasmas!'},
+ {bg:'#260d0d',tile:'#7a2e2e',msg:'Sobreviva as ondas por 30s!'},
+ {bg:'#0a2026',tile:'#0e6a7a',msg:'Empurre o bloco, pegue a chave e saia!'}
+];
+var EX_KEYS=['ex-mario','ex-zelda','ex-soul','ex-hollow','ex-mega','ex-runner','ex-coleta','ex-maze','ex-arena','ex-puzzle'];
+function exampleGame(key){ var i=EX_KEYS.indexOf(key); if(i<0)i=0;
+  var builders=[ function(){return exTplWin('mario',[{w:{id:'placarMaior',valor:2},a:{id:'vencer'}}]);}, function(){return exTplWin('zelda',null);}, function(){return exTplWin('soulknight',[{w:{id:'semInimigos'},a:{id:'vencer'}}]);}, function(){return exTplWin('hollow',[{w:{id:'semInimigos'},a:{id:'vencer'}}]);}, function(){return exTplWin('megaman',[{w:{id:'semInimigos'},a:{id:'vencer'}}]);}, exRunner, exColeta, exMaze, exArena, exPuzzle ];
+  var base=builders[i](); var set=EX_ART[i], th=EX_THEMES[i];
+  base.assets.forEach(function(a){ if(set[a.id]) a.raw=set[a.id]; });
+  var sc=base.scenes[0]; sc.bg=th.bg; sc.tileColor=th.tile; sc.globalRules=[{w:{id:'inicio'},a:{id:'mensagem',texto:th.msg,seg:3}}].concat(sc.globalRules||[]);
+  base.name=key.replace('ex-','modelo-'); return base; }
+var EX10CARDS=[
+ {key:'ex-mario',emoji:'🍄',title:'Plataforma clássica',ref:'tipo Mario',mode:'Plataforma',mechs:['Céu azul + chão temático','Moedas e plataformas','Inimigo que anda','Vence com 2 moedas']},
+ {key:'ex-zelda',emoji:'🗺️',title:'Aventura top-down',ref:'tipo Zelda',mode:'Top-down',mechs:['Espada + chave/porta','Bloco empurrável','NPC com fala','Inimigos']},
+ {key:'ex-soul',emoji:'🎯',title:'Shooter de salas',ref:'tipo Soul Knight',mode:'Top-down',mechs:['Mira no cursor','Vários inimigos','Vence sem inimigos']},
+ {key:'ex-hollow',emoji:'⚔️',title:'Metroidvania',ref:'tipo Hollow Knight',mode:'Plataforma',mechs:['Dash + pulo duplo','Wall jump + espada','Chefe + checkpoint']},
+ {key:'ex-mega',emoji:'🔫',title:'Run-and-gun',ref:'tipo Mega Man',mode:'Plataforma',mechs:['Tiro no J','Inimigos que pulam','Chefe']},
+ {key:'ex-runner',emoji:'🏃',title:'Corredor infinito',ref:'endless runner',mode:'Plataforma',mechs:['Herói auto-corre','Pule espinhos e buracos','Sobreviva 25s']},
+ {key:'ex-coleta',emoji:'⏱️',title:'Coleta contra o tempo',ref:'arcade',mode:'Top-down',mechs:['Cronômetro','Pegue 8 estrelas','Vitória/derrota por tempo']},
+ {key:'ex-maze',emoji:'🌀',title:'Labirinto / fuga',ref:'maze',mode:'Top-down',mechs:['Labirinto','Fantasmas perseguem','Ache a saída']},
+ {key:'ex-arena',emoji:'🛡️',title:'Arena / boss rush',ref:'survival',mode:'Plataforma',mechs:['Ondas de inimigos','Atire pra sobreviver','Aguente 30s']},
+ {key:'ex-puzzle',emoji:'🧩',title:'Puzzle de plataforma',ref:'puzzle',mode:'Plataforma',mechs:['Bloco empurrável','Botão + porta','Chave + saída']}
+];
+try{ Array.prototype.splice.apply(TEMPLATES,[1,5].concat(EX10CARDS)); }catch(e){ console.warn('EX10',e); }
+
 function renderNewCards(){ const w=g('newList'); if(!w)return; w.innerHTML=''; TEMPLATES.forEach(t=>{ const d=document.createElement('div'); d.style.cssText='border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;background:#0c1610;display:flex;flex-direction:column;gap:5px;transition:border-color .15s'; d.onmouseenter=()=>d.style.borderColor='var(--accent)'; d.onmouseleave=()=>d.style.borderColor='var(--line)';
    d.innerHTML='<div style="font-weight:bold;color:var(--accent);font-size:14px">'+t.emoji+' '+esc(t.title)+'</div><div class="note" style="color:var(--accent2);font-size:11px">Referencia: '+esc(t.ref)+' • '+esc(t.mode)+'</div><ul style="margin:3px 0 0 16px;font-size:11px;color:var(--txt);line-height:1.4;padding:0">'+t.mechs.map(m=>'<li>'+esc(m)+'</li>').join('')+'</ul>';
    d.onclick=()=>chooseTemplate(t.key); w.appendChild(d); }); }
@@ -2031,7 +2134,7 @@ function _uiToggle(kind){ if(!RUN)return; if(RUN._paused&&RUN._screen===kind){ _
 function _uiResume(){ if(!RUN)return; RUN._paused=false; RUN._screen=null; hideScreen(); if(PR.ui&&PR.ui.hud&&PR.ui.hud.on&&(PR.ui.hud.els||[]).length)showScreen('hud'); }
 function _uiAction(a,kind){ if(a==='iniciar'){ hideScreen(); try{ if(PR.scenes&&PR.scenes.length>1&&PR.cur!==0){ _carry=null; switchScene(0); } }catch(e){} startPlay(); } else if(a==='continuar'||a==='fechar'){ _uiResume(); } else if(a==='reiniciar'){ hideScreen(); stopPlay(); startPlay(); } else if(a==='sair'||a==='menu'){ hideScreen(); stopPlay(); if(a==='menu'&&PR.ui&&PR.ui.menu&&PR.ui.menu.on&&(PR.ui.menu.els||[]).length){ showScreen('menu'); } } else if(a==='carregar'){ const sv=_loadGame(); if(sv){ hideScreen(); try{ switchScene(sv.cur||0); }catch(e){} _carry={hp:sv.hp,score:sv.score,gstate:sv.gstate||{}}; startPlay(); } } else if(a==='salvar'){ try{_saveGame();}catch(e){} } }
 function playPressed(){ _uiEnsure(); if(PR.ui.menu.on&&(PR.ui.menu.els||[]).length){ showScreen('menu'); } else startPlay(); }
-function chooseTemplate(k){ confirmDialog('Criar um novo projeto com esse modelo? O projeto atual fica salvo localmente ate voce salvar de novo.').then(ok=>{ if(!ok)return; g('newTplModal').classList.remove('open'); try{ if(k==='3d'){ openG3d(); return; } if(k==='vazio'){ loadProject(newProject()); } else { loadProject(tplProject(k)); } touch(); toast('Modelo criado! Clique em ▶ Jogar para testar.'); }catch(e){ logMsg('Erro: '+e.message); } }); }
+function chooseTemplate(k){ confirmDialog('Criar um novo projeto com esse modelo? O projeto atual fica salvo localmente ate voce salvar de novo.').then(ok=>{ if(!ok)return; g('newTplModal').classList.remove('open'); try{ if(k==='3d'){ openG3d(); return; } if(k==='vazio'){ loadProject(newProject()); } else if(k.indexOf('ex-')===0){ loadProject(exampleGame(k)); } else { loadProject(tplProject(k)); } touch(); toast('Modelo criado! Clique em ▶ Jogar para testar.'); }catch(e){ logMsg('Erro: '+e.message); } }); }
 
 function tutAddEnemy(){ try{ let a=PR.assets.find(x=>x.id==='enemy'||x.name==='inimigo'); if(!a)a=addAsset(makeEnemy(),'inimigo'); const pl=SC.entities.find(e=>(e.behaviors||[]).some(b=>b.type==='player-platformer'||b.type==='player-topdown')); const px=pl?pl.x:200, py=pl?pl.y:200; const e=addEntity(a.id, px+220, py-40); e.behaviors=[{type:'inimigo-patrulha',params:{vida:2,velocidade:60,distancia:96}},{type:'animator',params:{parado:'idle',andando:'andar'}}]; select(e); draw(); touch(); toast('Inimigo adicionado! Ele anda de um lado ao outro.'); }catch(err){ logMsg('Erro: '+err.message); } }
 
